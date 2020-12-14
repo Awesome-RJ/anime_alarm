@@ -83,7 +83,7 @@ def run_cron():
 
         context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text='Daily subscription check finished!')
 
-    time_to_run = datetime.datetime.strptime('14/12/20 23:00:00','%d/%m/%y %H:%M:%S')
+    time_to_run = datetime.datetime.strptime('14/12/20 23:08:00','%d/%m/%y %H:%M:%S')
     time_to_run.replace(tzinfo=datetime.timezone(datetime.timedelta(hours=1)))
     job_queue.run_repeating(check_for_update, interval=43200, first=time_to_run)
     
@@ -414,7 +414,7 @@ def get_latest(update: Update, context: CallbackContext):
                 q.ref(q.collection(users), chat_id),
                 {
                     'data': {
-                        'name': update.message.chat.first_name + ' ' + update.message.chat.last_name,
+                        'name': update.message.chat.first_name,
                         'last_command': 'getlatest',
                         'animes_watching': []
                     }
