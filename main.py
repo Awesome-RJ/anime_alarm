@@ -364,7 +364,7 @@ def unwatch(update: Update, context: CallbackContext):
                         q.lambda_('doc_ref', q.get(q.var('doc_ref'))),
                         q.select(['data', 'animes_watching'], q.get(q.var('bot_user')))
                     ),
-                    'You are currently not watching any anime'
+                    'You are currently not subscribed to any anime'
                 )
             )
             
@@ -372,6 +372,7 @@ def unwatch(update: Update, context: CallbackContext):
 
         if type(animes_watched) is str:
             context.bot.send_message(chat_id=chat_id,text=animes_watched)
+        
         else:
             for anime in animes_watched:
                 markup = [[InlineKeyboardButton('Unwatch', callback_data='unwatch='+anime['ref'].id())]]
@@ -387,7 +388,10 @@ def unwatch(update: Update, context: CallbackContext):
                         }
                     }
                 )
-            )  
+            ) 
+
+        if animes_watched == []:
+            context.bot.send_message(chat_id=chat_id,text='You are currently not subscribed to any anime')
     except Exception as err:
         print(err)
         print(err.args)
