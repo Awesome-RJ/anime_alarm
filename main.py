@@ -486,9 +486,18 @@ dispatcher.add_handler(get_latest_handler)
 
 
 
-updater.start_polling()
+updater.start_webhook(
+    listen="0.0.0.0",
+    port=int(os.getenv('PORT')),
+    url_path=os.getenv('TELEGRAM_TOKEN')
+)
 
-run_cron()
+updater.bot.setWebhook('https://anime-alarm-bot.herokuapp.com/')
+
+if __name__ == '__main__':
+    run_cron()
+
+    
 #updater.idle()
 
 
