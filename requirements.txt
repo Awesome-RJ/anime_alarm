@@ -1,0 +1,7 @@
+requests=
+beautifulsoup=
+python_telegram_bot=13.1
+faunadb=4.0.1
+telegram=0.0.1
+python-dotenv=0.15.0
+pyshorteners=1.0.1

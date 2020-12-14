@@ -1,0 +1,12 @@
+{
+    "message": {
+        "help": "Hi, I'm Anime Alarm!\nI'm capable of bringing the latest anime episodes straight to your DMs for download and many more.\nHere's how to take advantage of my greatness:\n\n/watch - follow an anime for new episodes\n/unwatch - stop following an anime\n/latest - download the latest episode of any anime instantly\n/help - get help and learn about Anime Alarm\n/donate - donate to help this project",
+        "donate": [
+            "You can donate in Bitcoin and Ethereum to help the development of this project.",
+            "Bitcoin address:",
+            "1LjtBTjaormXaUbARHWh97gJwBCQ8ioov",
+            "Ethereum address:",
+            "0xe57a812d0185eddffda0097b6d5ba38f240325fa"
+        ]
+    }
+}
