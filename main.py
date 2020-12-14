@@ -484,10 +484,12 @@ dispatcher.add_handler(message_handler)
 dispatcher.add_handler(callback_handler)
 dispatcher.add_handler(get_latest_handler)
 
-updater.start_polling()
-updater.idle()
-
 run_cron()
+
+updater.start_polling()
+#updater.idle()
+
+
 
 #finish scraping  - done
 #finsh unwatch, donate and polish help command - done
