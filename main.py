@@ -13,7 +13,7 @@ import datetime
 load_dotenv()
 
 
-updater = Updater(token=os.getenv('TELEGRAM_TOKEN'), base_url='https://anime-alarm-bot.herokuapp.com/')
+updater = Updater(token=os.getenv('TELEGRAM_TOKEN'))
 dispatcher = updater.dispatcher
 job_queue = updater.job_queue
 
@@ -484,9 +484,11 @@ dispatcher.add_handler(message_handler)
 dispatcher.add_handler(callback_handler)
 dispatcher.add_handler(get_latest_handler)
 
-run_cron()
+
 
 updater.start_polling()
+
+run_cron()
 #updater.idle()
 
 
