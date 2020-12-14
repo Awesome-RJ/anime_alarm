@@ -492,12 +492,12 @@ updater.start_webhook(
     url_path=os.getenv('TELEGRAM_TOKEN')
 )
 
-updater.bot.setWebhook('https://anime-alarm-bot.herokuapp.com/')
+updater.bot.setWebhook('https://anime-alarm-bot.herokuapp.com/'+os.getenv('TELEGRAM_TOKEN'))
 
 if __name__ == '__main__':
     run_cron()
 
-    
+
 #updater.idle()
 
 
