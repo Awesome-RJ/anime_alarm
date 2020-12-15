@@ -16,12 +16,12 @@ load_dotenv()
 updater = Updater(token=os.getenv('TELEGRAM_TOKEN'))
 dispatcher = updater.dispatcher
 job_queue = updater.job_queue
+shorten = Shortener().tinyurl.short
 
 
 client = FaunaClient(secret=os.getenv('FAUNA_SERVER_SECRET'))
 users = 'users'
 animes = 'animes'
-anime_codes = 'anime_codes'
 all_users_by_anime = 'all_users_by_anime'
 anime_by_title = 'all_animes_by_title'
 
@@ -44,10 +44,12 @@ def run_cron():
         )
 
         for anime in all_animes['data']:
+            print(anime)
             episodes = get_anime_episodes(anime['data']['link'])
+            print(len(episodes))
             #if there are new episodes...
             if len(episodes) > anime['data']['episodes']:
-                if episodes[0] != anime['data']['latest_episode']:
+                if episodes[0] != anime['data']['last_episode']:
                     subscribed_users = client.query(
                         q.map_(
                             q.lambda_('doc_ref', q.get(q.var('doc_ref'))),
@@ -57,7 +59,7 @@ def run_cron():
 
                     client.query(
                         q.update(
-                            q.ref(q.collection(animes),anime['ref']),
+                            anime['ref'],
                             {
                                 'data':{
                                     'episodes': len(episodes),
@@ -67,15 +69,19 @@ def run_cron():
                         )
                     )
 
+                    subscribed_users = subscribed_users['data']
+
                     #get download link for new anime
-                    s = Shortener()
-                    download_link = s.tinyurl.short(get_anime_episode_download_link(episodes[0]))
+                    
+                    download_link = shorten(get_anime_episode_download_link(episodes[0]['link']))
 
                     markup = [[InlineKeyboardButton(text='Download', url=download_link)]]
                     #send message to subscribed users
+                    print(subscribed_users)
                     for user in subscribed_users:
-                        text = "Here's the latest episode for "+anime['data']['title']+'\n\n'+episodes[0]['title'],
-                        context.bot.send_message(chat_id=user['ref'].id(), text=text, reply_markup=InlineKeyboardMarkup(markup))
+                        print('sent to subscribed user')
+                        text = "Here's the latest episode for {0} - {1}".format(anime['data']['title'],episodes[0]['title']),
+                        context.bot.send_message(chat_id=int(user['ref'].id()), text=text, reply_markup=InlineKeyboardMarkup(markup))
                     #send message to admin
                     context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text=anime['data']['title']+' just got a new episode and was updated!')
             else:
@@ -83,9 +89,9 @@ def run_cron():
 
         context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text='Daily subscription check finished!')
 
-    time_to_run = datetime.datetime.strptime('14/12/20 23:08:00','%d/%m/%y %H:%M:%S')
+    time_to_run = datetime.datetime.strptime('15/12/20 20:05:00','%d/%m/%y %H:%M:%S')
     time_to_run.replace(tzinfo=datetime.timezone(datetime.timedelta(hours=1)))
-    job_queue.run_repeating(check_for_update, interval=43200, first=time_to_run)
+    job_queue.run_repeating(check_for_update, interval=14400, first=time_to_run)
     
 def plain_message(update: Update, context:CallbackContext):
     print(update.effective_message)
@@ -103,19 +109,7 @@ def plain_message(update: Update, context:CallbackContext):
             else:
                 context.bot.send_message(chat_id=chat_id, text='Here are the search results for '+message)
                 for result in search_results:
-                    print(result['link'])
-
-                    r = client.query(
-                        q.create(
-                            q.collection(anime_codes),
-                            {
-                                'data': {
-                                    'link':result['link']
-                                }
-                            }
-                        )
-                    )
-                    markup = [[InlineKeyboardButton('Select', callback_data='watch='+r['ref'].id())]]
+                    markup = [[InlineKeyboardButton('Select', callback_data='watch='+shorten(result['link']))]]
                     context.bot.send_photo(chat_id=chat_id, photo=result['thumbnail'], caption=result['title'], timeout=5, reply_markup=InlineKeyboardMarkup(markup))
                     
             #update last command
@@ -143,17 +137,8 @@ def plain_message(update: Update, context:CallbackContext):
                 for result in search_results:
                     print(result['link'])
 
-                    r = client.query(
-                        q.create(
-                            q.collection(anime_codes),
-                            {
-                                'data': {
-                                    'link':result['link']
-                                }
-                            }
-                        )
-                    )
-                    markup = [[InlineKeyboardButton('Select', callback_data='getlatest='+r['ref'].id())]]
+                    
+                    markup = [[InlineKeyboardButton('Select', callback_data='getlatest='+shorten(result['link']))]]
                     context.bot.send_photo(chat_id=chat_id, photo=result['thumbnail'], caption=result['title'], timeout=5, reply_markup=InlineKeyboardMarkup(markup))
                     
             #update last command
@@ -180,16 +165,12 @@ def callback_handler_func(update: Update, context: CallbackContext):
     [command, payload] = callback_message.split(sep='=')
 
     if command == 'watch':
-        doc = client.query(
-            q.get(q.ref(q.collection(anime_codes), callback_message.split(sep='=')[1]))
-        )
-        anime_link = doc['data']['link']
+       
         title = update.callback_query.message.caption
 
         #create a new anime document
         try:
-            episodes = get_anime_episodes(anime_link)
-            print(episodes)
+            episodes = get_anime_episodes(payload)
             anime = client.query(
                 q.create(
                     q.collection(animes),
@@ -197,7 +178,7 @@ def callback_handler_func(update: Update, context: CallbackContext):
                         'data': {
                             'title': title,
                             'followers': 0,
-                            'link': anime_link,
+                            'link': payload,
                             'episodes': len(episodes),
                             'last_episode':episodes[0] ,
                         }
@@ -261,7 +242,6 @@ def callback_handler_func(update: Update, context: CallbackContext):
             context.bot.send_message(chat_id=chat_id, text='You are now listening for updates on '+title)
 
     elif command == 'unwatch':
-        print(update)
         client.query(
             q.let(
                 {
@@ -305,14 +285,10 @@ def callback_handler_func(update: Update, context: CallbackContext):
         context.bot.send_message(chat_id=chat_id, text='You have stopped following '+update.callback_query.message.text)
 
     elif command == 'getlatest':
-        doc = client.query(
-            q.get(q.ref(q.collection(anime_codes), payload))
-        )
-        anime_link = doc['data']['link']
-        episodes = get_anime_episodes(anime_link)
+        episodes = get_anime_episodes(payload)
 
-        s = Shortener()
-        latest_episode_download_link = s.tinyurl.short(get_anime_episode_download_link(episodes[0]['link']))
+       
+        latest_episode_download_link = shorten(get_anime_episode_download_link(episodes[0]['link']))
 
         markup = [[InlineKeyboardButton(text='Download', url=latest_episode_download_link)]]
         context.bot.send_message(chat_id=chat_id, text=episodes[0]['title'], reply_markup=InlineKeyboardMarkup(markup)) 
@@ -321,8 +297,7 @@ def callback_handler_func(update: Update, context: CallbackContext):
 
 def watch(update, context):
     chat_id = update.effective_chat.id
-    print(update)
-    result = client.query(
+    client.query(
         q.if_(
             q.exists(q.ref(q.collection(users), chat_id)),
             q.update(
@@ -347,7 +322,6 @@ def watch(update, context):
         )
     )
     
-    print(result)
     context.bot.send_message(chat_id=chat_id, text= 'Enter the anime you want to get notifications for!')
 
 def unwatch(update: Update, context: CallbackContext):
@@ -424,7 +398,6 @@ def get_latest(update: Update, context: CallbackContext):
     )
     context.bot.send_message(chat_id=chat_id, text='Enter the anime you want to get!')
 
-
 def help(update, context):
     context.bot.send_message(chat_id=update.effective_chat.id, text=config['message']['help'])
     client.query(
@@ -490,16 +463,12 @@ dispatcher.add_handler(get_latest_handler)
 
 
 
-updater.start_webhook(
-    listen="0.0.0.0",
-    port=int(os.getenv('PORT')),
-    url_path=os.getenv('TELEGRAM_TOKEN')
-)
 
-updater.bot.setWebhook('https://anime-alarm-bot.herokuapp.com/'+os.getenv('TELEGRAM_TOKEN'))
 
 if __name__ == '__main__':
+    updater.start_polling()
     run_cron()
+    #app.run(host='127.0.0.1', port='3000')
 
 
 #updater.idle()
