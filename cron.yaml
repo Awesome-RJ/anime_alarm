@@ -1,4 +1,0 @@
-cron:
-  - description: 'daily subscription check - 6 hours interval'
-    url: /tasks/sub-check
-    schedule: every 6 hours
