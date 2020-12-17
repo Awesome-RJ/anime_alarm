@@ -11,6 +11,9 @@ from pyshorteners import Shortener
 import datetime
 from custom_logging import Logger
 from telegram.error import TelegramError, Unauthorized, BadRequest, TimedOut, ChatMigrated, NetworkError
+from multiprocessing import Pool
+from threading import Thread
+from typing import Union
 
 load_dotenv()
 
@@ -38,21 +41,20 @@ logger = Logger(config['app_log_path'])
 def log_error(error: Exception):
     logger.write('An error occurred: '+str(error))
 
-def is_admin(chat_id: [str, int]) -> bool:
+def is_admin(chat_id: Union[str, int]) -> bool:
     if str(chat_id) == str(os.getenv('ADMIN_CHAT_ID')):
         return True
     return False
 
 def run_cron():
     def check_for_update(context: CallbackContext):
-        context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text='About to run daily subscription check!')
+        context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text='About to run subscription check!')
         #get all anime
         all_animes = client.query(
             q.map_(
                 q.lambda_('doc_ref', q.get(q.var('doc_ref'))),
                 q.paginate(q.documents(q.collection(animes)))
-            )
-            
+            )   
         )
 
         for anime in all_animes['data']:
@@ -99,11 +101,13 @@ def run_cron():
             else:
                 pass
 
-        context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text='Daily subscription check finished!')
+        context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text='Subscription check finished!')
 
     time_to_run = datetime.datetime.strptime('17/12/20 05:52:00','%d/%m/%y %H:%M:%S')
     time_to_run.replace(tzinfo=datetime.timezone(datetime.timedelta(hours=1)))
     try:
+        # run job every 4 hours
+        # this automatically runs in a separate thread so no wahala
         job_queue.run_repeating(check_for_update, interval=14400, first=time_to_run)
     except Exception as err:
         log_error(err)
@@ -166,6 +170,29 @@ def plain_message(update: Update, context:CallbackContext):
                     }
                 )
             )        
+        except Exception as err:
+            log_error(err)
+    elif last_command == 'broadcast':
+        def send_broadcast(args):
+            context.bot.send_message(chat_id=args[0], text=args[1])
+        try: 
+            results = client.query(
+                q.paginate(q.documents(q.collection(users)))
+            )
+            results = results['data']
+
+            #spin 5 processes
+            with Pool(5) as p:
+                p.map(send_broadcast, [[int(user['ref'].id()), message] for user in results])
+
+            client.query(
+                q.update(
+                    q.ref(q.collection(users), chat_id),
+                    {
+                        'last_command': ''
+                    }
+                )
+            )
         except Exception as err:
             log_error(err)
     else:
@@ -484,7 +511,16 @@ def error_handler(update: Update, context: CallbackContext):
         raise context.error
     except Unauthorized as err:
         # user has blocked bot
+        # set user active status to false
         log_error(err)
+        client.query(
+            q.update(
+                q.ref(q.collection(animes), update.effective_chat.id),
+                {
+                    'active': False
+                }
+            )
+        )
     except BadRequest as err:
         # handle malformed requests - read more below!
         log_error(err)
@@ -503,9 +539,9 @@ def error_handler(update: Update, context: CallbackContext):
 
 def recommend(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
-    result = client.query(
-        q.map(
-            q.lambda_('doc_ref', q.get(q.collection(animes, q.var('doc_ref'))))
+    results = client.query(
+        q.map_(
+            q.lambda_('doc_ref', q.get(q.collection(animes, q.var('doc_ref')))),
             q.paginate(q.match(q.index(sort_anime_by_followers)),size=5)
         )
     )
@@ -545,7 +581,21 @@ def number_of_anime(update: Update, context: CallbackContext):
         context.bot.send_message(chat_id=chat_id, text='Number of anime: '+str(result))
 
 def broadcast(update: Update, context: CallbackContext):
-    pass
+    chat_id = update.effective_chat.id
+    if is_admin(chat_id):
+        context.bot.send_message(chat_id=chat_id, text='Enter the message you want to broadcast')
+        client.query(
+            q.update(
+                q.ref(q.collection(users), chat_id),
+                {
+                    'last_command': 'broadcast'
+                }
+            )
+        )
+    else:
+        context.bot.send_message(chat_id=chat_id, text='Only admins can use this command!')
+    
+
 
 watch_handler = CommandHandler('watch', watch)
 unwatch_handler = CommandHandler('unwatch', unwatch)
@@ -576,8 +626,9 @@ dispatcher.add_error_handler(error_handler)
 
 
 if __name__ == '__main__':
-    updater.start_polling()
-    run_cron()
+    #updater.start_polling()
+    #run_cron()
+    print(is_admin('1042382451'))
 
 #todo:
 #Broadcast feature
