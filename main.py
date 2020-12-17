@@ -202,6 +202,7 @@ def plain_message(update: Update, context:CallbackContext):
 
 def callback_handler_func(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
+    print(update)
     callback_message = update.callback_query.message.reply_markup.inline_keyboard[0][0].callback_data
     
     
@@ -211,7 +212,8 @@ def callback_handler_func(update: Update, context: CallbackContext):
        
         title = update.callback_query.message.caption
         if title == None or title == '':
-            title = ''.join(update.effective_message.text.split(sep='.')[1:]).strip()
+            
+            #title = '.'.join(update.effective_message.text.split(sep='.')[1:]).strip()
 
         #create a new anime document
         try:
