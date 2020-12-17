@@ -8,5 +8,6 @@
             "Ethereum address:",
             "0xe57a812d0185eddffda0097b6d5ba38f240325fa"
         ]
-    }
+    },
+    "app_log_path": "./app.log"
 }
