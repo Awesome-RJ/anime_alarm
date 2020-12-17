@@ -29,7 +29,7 @@ users = 'users'
 animes = 'animes'
 all_users_by_anime = 'all_users_by_anime'
 anime_by_title = 'all_animes_by_title'
-sort_anime_by_followers = 'sort_anime_by_followers'
+sort_anime_by_followers = 'sort_animes_by_followers'
 
 # setting up config file
 config = {}
@@ -541,7 +541,7 @@ def recommend(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
     results = client.query(
         q.map_(
-            q.lambda_('doc_ref', q.get(q.collection(animes, q.var('doc_ref')))),
+            q.lambda_(['followers','doc_ref'], q.get(q.collection(animes, q.var('doc_ref')))),
             q.paginate(q.match(q.index(sort_anime_by_followers)),size=5)
         )
     )
