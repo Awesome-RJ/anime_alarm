@@ -212,7 +212,7 @@ def callback_handler_func(update: Update, context: CallbackContext):
        
         title = update.callback_query.message.caption
         if title == None or title == '':
-            
+            print('')
             #title = '.'.join(update.effective_message.text.split(sep='.')[1:]).strip()
 
         #create a new anime document
