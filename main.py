@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 import json
 from pyshorteners import Shortener
 import datetime
-from logging import Logger
+from custom_logging import Logger
 from telegram.error import TelegramError, Unauthorized, BadRequest, TimedOut, ChatMigrated, NetworkError
 
 load_dotenv()
@@ -502,7 +502,19 @@ def error_handler(update: Update, context: CallbackContext):
         log_error(err)
 
 def recommend(update: Update, context: CallbackContext):
-    pass
+    chat_id = update.effective_chat.id
+    result = client.query(
+        q.map(
+            q.lambda_('doc_ref', q.get(q.collection(animes, q.var('doc_ref'))))
+            q.paginate(q.match(q.index(sort_anime_by_followers)),size=5)
+        )
+    )
+
+    context.bot.send_message(chat_id=chat_id, text='Here are the top animes people using Anime Alarm are watching')
+
+    for anime in results['data']:
+        markup = [[InlineKeyboardButton('Watch', callback_data='watch='+shorten(anime['data']['link']))]]
+        context.bot.send_message(chat_id=chat_id, reply_markup=InlineKeyboardMarkup(markup),text=str(results['data'].index(anime)+1)+'. '+anime['data']['title'])
 
 def number_of_users(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
@@ -532,6 +544,8 @@ def number_of_anime(update: Update, context: CallbackContext):
         )
         context.bot.send_message(chat_id=chat_id, text='Number of anime: '+str(result))
 
+def broadcast(update: Update, context: CallbackContext):
+    pass
 
 watch_handler = CommandHandler('watch', watch)
 unwatch_handler = CommandHandler('unwatch', unwatch)
@@ -543,6 +557,7 @@ get_latest_handler = CommandHandler('latest', get_latest)
 recommend_handler = CommandHandler('recommend', recommend)
 users_handler = CommandHandler('usercount', number_of_users)
 anime_handler = CommandHandler('animecount', number_of_anime)
+broadcast_handler = CommandHandler('broadcast', broadcast)
 
 dispatcher.add_handler(watch_handler)
 dispatcher.add_handler(unwatch_handler)
@@ -554,6 +569,7 @@ dispatcher.add_handler(get_latest_handler)
 dispatcher.add_handler(recommend_handler)
 dispatcher.add_handler(users_handler)
 dispatcher.add_handler(anime_handler)
+dispatcher.add_handler(broadcast_handler)
 
 dispatcher.add_error_handler(error_handler)
 
@@ -563,7 +579,9 @@ if __name__ == '__main__':
     updater.start_polling()
     run_cron()
 
-
+#todo:
+#Broadcast feature
+#make broadcast and run_cron functions run on a separate thread
 
 
 
