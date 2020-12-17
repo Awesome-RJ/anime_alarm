@@ -26,6 +26,7 @@ users = 'users'
 animes = 'animes'
 all_users_by_anime = 'all_users_by_anime'
 anime_by_title = 'all_animes_by_title'
+sort_anime_by_followers = 'sort_anime_by_followers'
 
 # setting up config file
 config = {}
@@ -37,6 +38,10 @@ logger = Logger(config['app_log_path'])
 def log_error(error: Exception):
     logger.write('An error occurred: '+str(error))
 
+def is_admin(chat_id: [str, int]) -> bool:
+    if str(chat_id) == str(os.getenv('ADMIN_CHAT_ID')):
+        return True
+    return False
 
 def run_cron():
     def check_for_update(context: CallbackContext):
@@ -418,7 +423,12 @@ def get_latest(update: Update, context: CallbackContext):
         log_error(err)
 
 def help(update, context):
-    context.bot.send_message(chat_id=update.effective_chat.id, text=config['message']['help'])
+    message = ''
+    if is_admin:
+        message = config['message']['help_admin']
+    else:
+        message = config['message']['help']
+    context.bot.send_message(chat_id=update.effective_chat.id, text=message)
     try:
         client.query(
             q.let(
@@ -491,6 +501,37 @@ def error_handler(update: Update, context: CallbackContext):
         # handle all other telegram related errors
         log_error(err)
 
+def recommend(update: Update, context: CallbackContext):
+    pass
+
+def number_of_users(update: Update, context: CallbackContext):
+    chat_id = update.effective_chat.id
+    if is_admin(chat_id):
+        result = client.query(
+            q.count(
+                q.paginate(
+                    q.documents(
+                        q.collection(users)
+                    )
+                )
+            )
+        )
+        context.bot.send_message(chat_id=chat_id, text='Number of users: '+str(result))
+
+def number_of_anime(update: Update, context: CallbackContext):
+    chat_id = update.effective_chat.id
+    if is_admin(chat_id):
+        result = client.query(
+            q.count(
+                q.paginate(
+                    q.documents(
+                        q.collection(animes)
+                    )
+                ) 
+            )
+        )
+        context.bot.send_message(chat_id=chat_id, text='Number of anime: '+str(result))
+
 
 watch_handler = CommandHandler('watch', watch)
 unwatch_handler = CommandHandler('unwatch', unwatch)
@@ -499,6 +540,9 @@ donate_handler = CommandHandler('donate', donate)
 message_handler = MessageHandler(Filters.text & (~Filters.command), plain_message)
 callback_handler = CallbackQueryHandler(callback_handler_func)
 get_latest_handler = CommandHandler('latest', get_latest)
+recommend_handler = CommandHandler('recommend', recommend)
+users_handler = CommandHandler('usercount', number_of_users)
+anime_handler = CommandHandler('animecount', number_of_anime)
 
 dispatcher.add_handler(watch_handler)
 dispatcher.add_handler(unwatch_handler)
@@ -507,6 +551,9 @@ dispatcher.add_handler(donate_handler)
 dispatcher.add_handler(message_handler)
 dispatcher.add_handler(callback_handler)
 dispatcher.add_handler(get_latest_handler)
+dispatcher.add_handler(recommend_handler)
+dispatcher.add_handler(users_handler)
+dispatcher.add_handler(anime_handler)
 
 dispatcher.add_error_handler(error_handler)
 
