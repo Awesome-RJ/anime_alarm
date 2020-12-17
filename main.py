@@ -14,6 +14,7 @@ from telegram.error import TelegramError, Unauthorized, BadRequest, TimedOut, Ch
 from multiprocessing import Pool
 from threading import Thread
 from typing import Union
+from my_workaround import send_broadcast
 
 load_dotenv()
 
@@ -111,7 +112,9 @@ def run_cron():
         job_queue.run_repeating(check_for_update, interval=14400, first=time_to_run)
     except Exception as err:
         log_error(err)
-    
+
+
+
 def plain_message(update: Update, context:CallbackContext):
     print(update.effective_message)
     bot_user = client.query(q.get(q.ref(q.collection('users'), update.effective_chat.id)))
@@ -175,28 +178,32 @@ def plain_message(update: Update, context:CallbackContext):
         except Exception as err:
             log_error(err)
     elif last_command == 'broadcast':
-        def send_broadcast(args):
-            context.bot.send_message(chat_id=args[0], text=args[1])
-        try: 
-            results = client.query(
-                q.paginate(q.documents(q.collection(users)))
-            )
-            results = results['data']
-
-            #spin 5 processes
-            with Pool(5) as p:
-                p.map(send_broadcast, [[int(user['ref'].id()), message] for user in results])
-
-            client.query(
-                q.update(
-                    q.ref(q.collection(users), chat_id),
-                    {
-                        'last_command': ''
-                    }
+        if is_admin(chat_id):
+            print('is_admin')
+            context.bot.send_message(chat_id=chat_id, text='Broadcasting message...')
+            try: 
+                results = client.query(
+                    q.paginate(q.documents(q.collection(users)))
                 )
-            )
-        except Exception as err:
-            log_error(err)
+                results = results['data']
+                print(results[0].id())
+
+                #spin 5 processes
+                with Pool(5) as p:
+                    p.map(send_broadcast, [[int(user_ref.id()), message] for user_ref in results])
+
+                client.query(
+                    q.update(
+                        q.ref(q.collection(users), chat_id),
+                        {
+                            'last_command': ''
+                        }
+                    )
+                )
+            except Exception as err:
+                log_error(err)
+        else:
+            pass
     else:
         pass
 
@@ -209,14 +216,14 @@ def callback_handler_func(update: Update, context: CallbackContext):
     [command, payload] = callback_message.split(sep='=')
 
     if command == 'watch':
-       
-        title = update.callback_query.message.caption
-        if title == None or title == '':
-            print('')
-            #title = '.'.join(update.effective_message.text.split(sep='.')[1:]).strip()
-
-        #create a new anime document
         try:
+            title = update.callback_query.message.caption
+            print(title)
+            if title == None:
+                title = '.'.join(update.effective_message.text.split(sep='.')[1:]).strip()
+            
+            #create a new anime document
+            
             episodes = get_anime_episodes(payload)
             anime = client.query(
                 q.create(
@@ -234,14 +241,10 @@ def callback_handler_func(update: Update, context: CallbackContext):
             )
 
         except Exception as err:
-            log_error(err)
             anime = client.query(  
                 q.get(q.match(q.index(anime_by_title), title))
             )
-            print(anime)
-            
-           
-        
+            print(anime)        
         #update user's watch list
         try:
             result = client.query(
@@ -524,7 +527,9 @@ def error_handler(update: Update, context: CallbackContext):
             q.update(
                 q.ref(q.collection(animes), update.effective_chat.id),
                 {
-                    'active': False
+                    'data': {
+                        'active': False
+                    }
                 }
             )
         )
@@ -558,7 +563,7 @@ def recommend(update: Update, context: CallbackContext):
     for anime in results['data']:
         link = ''
         if anime['data']['link'].startswith('https://tinyurl.com/'):
-            pass
+            link = anime['data']['link']
         else:
             link = shorten(anime['data']['link'])
         markup = [[InlineKeyboardButton('Watch', callback_data='watch='+link)]]
@@ -600,7 +605,9 @@ def broadcast(update: Update, context: CallbackContext):
             q.update(
                 q.ref(q.collection(users), chat_id),
                 {
-                    'last_command': 'broadcast'
+                    'data':{
+                        'last_command': 'broadcast'
+                    }
                 }
             )
         )
