@@ -119,6 +119,8 @@ def plain_message(update: Update, context:CallbackContext):
     last_command = bot_user['data']['last_command']
     message = update.message.text
 
+    print(last_command)
+
     if last_command == 'watch':
         try: 
             search_results = get_anime(message, limit=15)
@@ -202,11 +204,14 @@ def callback_handler_func(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
     callback_message = update.callback_query.message.reply_markup.inline_keyboard[0][0].callback_data
     
+    
     [command, payload] = callback_message.split(sep='=')
 
     if command == 'watch':
        
         title = update.callback_query.message.caption
+        if title == None or title == '':
+            title = ''.join(update.effective_message.text.split(sep='.')[1:]).strip()
 
         #create a new anime document
         try:
@@ -569,7 +574,7 @@ def number_of_users(update: Update, context: CallbackContext):
                 )
             )
         )
-        context.bot.send_message(chat_id=chat_id, text='Number of users: '+str(result))
+        context.bot.send_message(chat_id=chat_id, text='Number of users: '+str(result['data'][0]))
 
 def number_of_anime(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
@@ -583,7 +588,7 @@ def number_of_anime(update: Update, context: CallbackContext):
                 ) 
             )
         )
-        context.bot.send_message(chat_id=chat_id, text='Number of anime: '+str(result))
+        context.bot.send_message(chat_id=chat_id, text='Number of anime: '+str(result['data'][0]))
 
 def broadcast(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
