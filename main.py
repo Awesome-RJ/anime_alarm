@@ -541,7 +541,7 @@ def recommend(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
     results = client.query(
         q.map_(
-            q.lambda_(['followers','doc_ref'], q.get(q.collection(animes, q.var('doc_ref')))),
+            q.lambda_(['followers','doc_ref'], q.get(q.var('doc_ref'))),
             q.paginate(q.match(q.index(sort_anime_by_followers)),size=5)
         )
     )
