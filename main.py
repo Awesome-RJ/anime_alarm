@@ -626,9 +626,8 @@ dispatcher.add_error_handler(error_handler)
 
 
 if __name__ == '__main__':
-    #updater.start_polling()
-    #run_cron()
-    print(is_admin('1042382451'))
+    updater.start_polling()
+    run_cron()
 
 #todo:
 #Broadcast feature
