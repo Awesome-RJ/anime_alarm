@@ -549,7 +549,12 @@ def recommend(update: Update, context: CallbackContext):
     context.bot.send_message(chat_id=chat_id, text='Here are the top animes people using Anime Alarm are watching')
 
     for anime in results['data']:
-        markup = [[InlineKeyboardButton('Watch', callback_data='watch='+shorten(anime['data']['link']))]]
+        link = ''
+        if anime['data']['link'].startswith('https://tinyurl.com/'):
+            pass
+        else:
+            link = shorten(anime['data']['link'])
+        markup = [[InlineKeyboardButton('Watch', callback_data='watch='+link)]]
         context.bot.send_message(chat_id=chat_id, reply_markup=InlineKeyboardMarkup(markup),text=str(results['data'].index(anime)+1)+'. '+anime['data']['title'])
 
 def number_of_users(update: Update, context: CallbackContext):
