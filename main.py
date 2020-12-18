@@ -95,8 +95,9 @@ def run_cron():
                     print(subscribed_users)
                     for user in subscribed_users:
                         print('sent to subscribed user')
-                        text = "Here's the latest episode for {0} - {1}".format(anime['data']['title'],episodes[0]['title']),
-                        context.bot.send_message(chat_id=int(user['ref'].id()), text=text[0], reply_markup=InlineKeyboardMarkup(markup))
+                        text = "Here's the latest episode for {0}:\n\n{1}".format(anime['data']['title'],episodes[0]['title'])
+                        #int(user['ref'].id())
+                        context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text=text, reply_markup=InlineKeyboardMarkup(markup))
                     #send message to admin
                     context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text=anime['data']['title']+' just got a new episode and was updated!')
             else:
@@ -104,7 +105,7 @@ def run_cron():
 
         context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text='Subscription check finished!')
 
-    time_to_run = datetime.datetime.strptime('18/12/20 22:15:00','%d/%m/%y %H:%M:%S')
+    time_to_run = datetime.datetime.strptime('18/12/20 22:35:00','%d/%m/%y %H:%M:%S')
     time_to_run.replace(tzinfo=datetime.timezone(datetime.timedelta(hours=1)))
     try:
         # run job every 4 hours
