@@ -105,7 +105,7 @@ def run_cron():
 
         context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text='Subscription check finished!')
 
-    time_to_run = datetime.datetime.strptime('18/12/20 22:40:00','%d/%m/%y %H:%M:%S')
+    time_to_run = datetime.datetime.strptime('19/12/20 06:20:00','%d/%m/%y %H:%M:%S')
     time_to_run.replace(tzinfo=datetime.timezone(datetime.timedelta(hours=1)))
     try:
         # run job every 4 hours
@@ -539,10 +539,10 @@ def error_handler(update: Update, context: CallbackContext):
         log_error(err)
     except TimedOut:
         # handle slow connection problems
-        pass
+        log_error(err)
     except NetworkError:
         # handle other connection problems
-        pass
+        log_error(err)
     except ChatMigrated as err:
         # the chat_id of a group has changed, use e.new_chat_id instead
         log_error(err)
