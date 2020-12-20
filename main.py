@@ -7,7 +7,6 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackQueryH
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from dotenv import load_dotenv
 import json
-from pyshorteners import Shortener
 import datetime
 from custom_logging import Logger
 from telegram.error import TelegramError, Unauthorized, BadRequest, TimedOut, ChatMigrated, NetworkError
@@ -15,6 +14,8 @@ from multiprocessing import Pool
 from threading import Thread
 from typing import Union
 from my_workaround import send_broadcast
+from shorten_link import shorten
+from datetime import datetime
 
 load_dotenv()
 
@@ -22,7 +23,6 @@ load_dotenv()
 updater = Updater(token=os.getenv('TELEGRAM_TOKEN'))
 dispatcher = updater.dispatcher
 job_queue = updater.job_queue
-shorten = Shortener().tinyurl.short
 
 # setting up fauna stuff
 client = FaunaClient(secret=os.getenv('FAUNA_SERVER_SECRET'))
@@ -77,8 +77,10 @@ def run_cron():
                     subscribed_users = subscribed_users['data']
 
                     #get download link for new anime
+
                     
                     download_link = shorten(get_anime_episode_download_link(episodes[0]['link']))
+                    print(episodes[0]['link'])
 
                     markup = [[InlineKeyboardButton(text='Download', url=download_link)]]
                     #send message to subscribed users
@@ -107,14 +109,14 @@ def run_cron():
 
         context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text='Subscription check finished!')
 
-    time_to_run = datetime.datetime.strptime('19/12/20 06:20:00','%d/%m/%y %H:%M:%S')
-    time_to_run.replace(tzinfo=datetime.timezone(datetime.timedelta(hours=1)))
+    time_to_run = datetime.datetime.strptime(str(datetime.now() + datetime.timedelta(seconds=30)).split('.')[0],'%y-%m-%d %H:%M:%S')
+    #time_to_run.replace(tzinfo=datetime.timezone(datetime.timedelta(hours=1)))
     try:
         # run job every 4 hours
         # this automatically runs in a separate thread so no wahala
         job_queue.run_repeating(check_for_update, interval=14400, first=time_to_run)
     except Exception as err:
-        context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text=str(err))
+        dispatcher.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text=str(err))
         log_error(err)
 
 
@@ -566,7 +568,7 @@ def recommend(update: Update, context: CallbackContext):
 
     for anime in results['data']:
         link = ''
-        if anime['data']['link'].startswith('https://tinyurl.com/'):
+        if anime['data']['link'].startswith('https://tinyurl.com/') or anime['data']['link'].startswith('https://bit.ly/'):
             link = anime['data']['link']
         else:
             link = shorten(anime['data']['link'])
