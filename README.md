@@ -4,4 +4,4 @@ Anime Alarm notifies users whenever a new episode of their favourite anime is ou
 
 Anime alarm also gives anime recommendations based on what other people using Anime Alarm are watching.
 
-Get started here: http://t.me/anime_alarm_bot?start 
+Get started here: http://t.me/anime_alarm_bot?start 
