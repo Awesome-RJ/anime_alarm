@@ -6,6 +6,13 @@ from pyshorteners import Shortener
 
 load_dotenv()
 
+class CannotDownloadAnimeException(Exception):
+    def __init__(self, anime, base_err:Exception):
+        self.anime = anime
+        self.base_err = base_err
+        super().__init__(anime+' could not be downloaded')
+    def __str__(self):
+        return self.anime+' could not be downloaded: '+str(self.base_err)
 
 def get_anime(anime:str, limit=10) -> list:
     anime = '+'.join(anime.split(sep=' '))
@@ -86,7 +93,7 @@ def get_anime_episode_download_link(anime_link:str) -> str:
 
         durl = result.find('a')['href']
     except Exception as err:
-        raise Exception(anime_link+' could not be downloaded: '+str(err))
+        raise CannotDownloadAnimeException(anime_link, err)
     headers = {
         'scheme': 'https',
         'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36',

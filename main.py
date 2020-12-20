@@ -1,5 +1,5 @@
 import os
-from scraping import get_anime, get_anime_episodes, get_anime_episode_download_link
+from scraping import get_anime, get_anime_episodes, get_anime_episode_download_link, CannotDownloadAnimeException
 from faunadb.client import FaunaClient
 from faunadb import query as q
 from faunadb.objects import Ref, FaunaTime
@@ -38,8 +38,13 @@ with open('config.json', 'r') as f:
 
 # setting up custom logger
 logger = Logger(config['app_log_path'])
-def log_error(error: Exception):
-    logger.write('An error occurred: '+str(error))
+def log_error(error: Exception, log_to_admin_telegram=True):
+    error_message = 'An error occurred: '+str(error)
+    logger.write(error_message)
+    if log_to_admin_telegram:
+        dispatcher.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text=error_message)
+    else:
+        pass
 
 def is_admin(chat_id: Union[str, int]) -> bool:
     if str(chat_id) == str(os.getenv('ADMIN_CHAT_ID')):
@@ -71,51 +76,52 @@ def run_cron():
                         )
                     )
 
-                    
-
                     subscribed_users = subscribed_users['data']
 
                     #get download link for new anime
-
-                    
-                    download_link = shorten(get_anime_episode_download_link(episodes[0]['link']))
-                    print(episodes[0]['link'])
-
-                    markup = [[InlineKeyboardButton(text='Download', url=download_link)]]
-                    #send message to subscribed users
-                    for user in subscribed_users:
-                        print('sent to subscribed user')
-                        text = "Here's the latest episode for {0}:\n\n{1}".format(anime['data']['title'],episodes[0]['title'])
-                        
-                        context.bot.send_message(chat_id=int(user['ref'].id()), text=text, reply_markup=InlineKeyboardMarkup(markup))
-                    
-                    # update anime in db after sending messages to users
-                    client.query(
-                        q.update(
-                            anime['ref'],
-                            {
-                                'data':{
-                                    'episodes': len(episodes),
-                                    'last_episode': episodes[0]
+                    try:
+                        download_link = shorten(get_anime_episode_download_link(episodes[0]['link']))
+                    except CannotDownloadAnimeException:
+                        # tell subscribed user episode is available but can't download
+                        for user in subscribed_users:
+                            text = "A new episode for {0}: {1} is now out.\nSadly, I could not download it\U0001F622".format(anime['data']['title'],episodes[0]['title'])
+                            context.bot.send_message(chat_id=int(user['ref'].id()), text=text)
+                        #send message to admin
+                        context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text=anime['data']['title']+' just got a new episode but could not be downloaded')
+                    else:
+                        markup = [[InlineKeyboardButton(text='Download', url=download_link)]]
+                        #send message to subscribed users
+                        for user in subscribed_users:
+                            print('sent to subscribed user')
+                            text = "Here's the latest episode for {0}:\n\n{1}".format(anime['data']['title'],episodes[0]['title'])
+                            
+                            context.bot.send_message(chat_id=int(user['ref'].id()), text=text, reply_markup=InlineKeyboardMarkup(markup))
+                        #send message to admin
+                        context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text=anime['data']['title']+' just got a new episode and was updated!')
+                    finally:
+                        # update anime in db after sending messages to users
+                        client.query(
+                            q.update(
+                                anime['ref'],
+                                {
+                                    'data':{
+                                        'episodes': len(episodes),
+                                        'last_episode': episodes[0]
+                                    }
                                 }
-                            }
+                            )
                         )
-                    )
-                    #send message to admin
-                    context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text=anime['data']['title']+' just got a new episode and was updated!')
+                else:
+                    pass
             else:
                 pass
 
         context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text='Subscription check finished!')
-
-    #time_to_run = datetime.datetime.strptime(str(datetime.datetime.now() + datetime.timedelta(seconds=30)).split('.')[0],'%y-%m-%d %H:%M:%S')
-    #time_to_run.replace(tzinfo=datetime.timezone(datetime.timedelta(hours=1)))
     try:
         # run job every 4 hours
         # this automatically runs in a separate thread so no wahala
         job_queue.run_repeating(check_for_update, interval=14400, first=datetime.datetime.now() + datetime.timedelta(seconds=30))
     except Exception as err:
-        dispatcher.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text=str(err))
         log_error(err)
 
 
@@ -350,6 +356,10 @@ def callback_handler_func(update: Update, context: CallbackContext):
             latest_episode_download_link = shorten(get_anime_episode_download_link(episodes[0]['link']))
             markup = [[InlineKeyboardButton(text='Download', url=latest_episode_download_link)]]
             context.bot.send_message(chat_id=chat_id, text=episodes[0]['title'], reply_markup=InlineKeyboardMarkup(markup))
+        except CannotDownloadAnimeException as err:
+            log_error(err, log_to_admin_telegram=False)
+            context.bot.send_message(chat_id=chat_id, text="Sorry,"+episodes[0]['title']+" could not be downloaded at this time!")
+            context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text='A user tried to download '+episodes[0]['title']+" but could not due to error: "+str(err))
         except Exception as err:
             log_error(err) 
     else:
