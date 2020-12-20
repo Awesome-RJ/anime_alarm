@@ -14,7 +14,7 @@ from threading import Thread
 from typing import Union
 from my_workaround import send_broadcast
 from shorten_link import shorten
-from datetime import datetime
+import datetime
 
 load_dotenv()
 
@@ -108,7 +108,7 @@ def run_cron():
 
         context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text='Subscription check finished!')
 
-    time_to_run = datetime.strptime(str(datetime.now() + datetime.timedelta(seconds=30)).split('.')[0],'%y-%m-%d %H:%M:%S')
+    time_to_run = datetime.datetime.strptime(str(datetime.datetime.now() + datetime.timedelta(seconds=30)).split('.')[0],'%y-%m-%d %H:%M:%S')
     #time_to_run.replace(tzinfo=datetime.timezone(datetime.timedelta(hours=1)))
     try:
         # run job every 4 hours
