@@ -7,7 +7,6 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackQueryH
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from dotenv import load_dotenv
 import json
-import datetime
 from custom_logging import Logger
 from telegram.error import TelegramError, Unauthorized, BadRequest, TimedOut, ChatMigrated, NetworkError
 from multiprocessing import Pool
@@ -109,7 +108,7 @@ def run_cron():
 
         context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text='Subscription check finished!')
 
-    time_to_run = datetime.datetime.strptime(str(datetime.now() + datetime.timedelta(seconds=30)).split('.')[0],'%y-%m-%d %H:%M:%S')
+    time_to_run = datetime.strptime(str(datetime.now() + datetime.timedelta(seconds=30)).split('.')[0],'%y-%m-%d %H:%M:%S')
     #time_to_run.replace(tzinfo=datetime.timezone(datetime.timedelta(hours=1)))
     try:
         # run job every 4 hours
