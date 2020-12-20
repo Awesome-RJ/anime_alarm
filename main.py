@@ -108,12 +108,12 @@ def run_cron():
 
         context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text='Subscription check finished!')
 
-    time_to_run = datetime.datetime.strptime(str(datetime.datetime.now() + datetime.timedelta(seconds=30)).split('.')[0],'%y-%m-%d %H:%M:%S')
+    #time_to_run = datetime.datetime.strptime(str(datetime.datetime.now() + datetime.timedelta(seconds=30)).split('.')[0],'%y-%m-%d %H:%M:%S')
     #time_to_run.replace(tzinfo=datetime.timezone(datetime.timedelta(hours=1)))
     try:
         # run job every 4 hours
         # this automatically runs in a separate thread so no wahala
-        job_queue.run_repeating(check_for_update, interval=14400, first=time_to_run)
+        job_queue.run_repeating(check_for_update, interval=14400, first=datetime.datetime.now() + datetime.timedelta(seconds=30))
     except Exception as err:
         dispatcher.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text=str(err))
         log_error(err)
