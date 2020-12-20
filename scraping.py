@@ -84,8 +84,8 @@ def get_anime_episode_download_link(anime_link:str) -> str:
 
 
         durl = result.find('a')['href']
-    except:
-        raise Exception('This anime could not be downloaded')
+    except Exception as err:
+        raise Exception(anime_link+' could not be downloaded: '+str(err))
     headers = {
         'scheme': 'https',
         'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36',

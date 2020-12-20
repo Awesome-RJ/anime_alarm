@@ -72,6 +72,23 @@ def run_cron():
                         )
                     )
 
+                    
+
+                    subscribed_users = subscribed_users['data']
+
+                    #get download link for new anime
+                    
+                    download_link = shorten(get_anime_episode_download_link(episodes[0]['link']))
+
+                    markup = [[InlineKeyboardButton(text='Download', url=download_link)]]
+                    #send message to subscribed users
+                    for user in subscribed_users:
+                        print('sent to subscribed user')
+                        text = "Here's the latest episode for {0}:\n\n{1}".format(anime['data']['title'],episodes[0]['title'])
+                        
+                        context.bot.send_message(chat_id=int(user['ref'].id()), text=text, reply_markup=InlineKeyboardMarkup(markup))
+                    
+                    # update anime in db after sending messages to users
                     client.query(
                         q.update(
                             anime['ref'],
@@ -83,21 +100,6 @@ def run_cron():
                             }
                         )
                     )
-
-                    subscribed_users = subscribed_users['data']
-
-                    #get download link for new anime
-                    
-                    download_link = shorten(get_anime_episode_download_link(episodes[0]['link']))
-
-                    markup = [[InlineKeyboardButton(text='Download', url=download_link)]]
-                    #send message to subscribed users
-                    print(subscribed_users)
-                    for user in subscribed_users:
-                        print('sent to subscribed user')
-                        text = "Here's the latest episode for {0}:\n\n{1}".format(anime['data']['title'],episodes[0]['title'])
-                        
-                        context.bot.send_message(chat_id=int(user['ref'].id()), text=text, reply_markup=InlineKeyboardMarkup(markup))
                     #send message to admin
                     context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text=anime['data']['title']+' just got a new episode and was updated!')
             else:
@@ -112,6 +114,7 @@ def run_cron():
         # this automatically runs in a separate thread so no wahala
         job_queue.run_repeating(check_for_update, interval=14400, first=time_to_run)
     except Exception as err:
+        context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text=str(err))
         log_error(err)
 
 
