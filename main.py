@@ -1,7 +1,7 @@
 import os
 from scraping import get_anime, get_anime_episodes, get_anime_episode_download_link, CannotDownloadAnimeException
 from faunadb.client import FaunaClient
-from faunadb import query as q
+from faunadb import query as q, errors
 from faunadb.objects import Ref, FaunaTime
 from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackQueryHandler, Filters, CallbackContext, Job, JobQueue
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -215,9 +215,9 @@ def plain_message(update: Update, context:CallbackContext):
             except Exception as err:
                 log_error(err)
         else:
-            pass
+            context.bot.send_message(chat_id=chat_id, text="Only admins can use this command!")
     else:
-        pass
+        context.bot.send_message(chat_id=chat_id, text="Sorry, I do not understand what you mean.\nPlease use the /help command to discover what I can helep you with.")
 
 def callback_handler_func(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
@@ -476,12 +476,13 @@ def get_latest(update: Update, context: CallbackContext):
         log_error(err)
 
 def help(update, context):
+    chat_id = update.effective_chat.id
     message = ''
-    if is_admin:
+    if is_admin(chat_id):
         message = config['message']['help_admin']
     else:
         message = config['message']['help']
-    context.bot.send_message(chat_id=update.effective_chat.id, text=message)
+    context.bot.send_message(chat_id=chat_id, text=message)
     try:
         client.query(
             q.let(
