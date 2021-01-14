@@ -1,13 +1,11 @@
 import os
-from scraping import get_anime, get_anime_episodes, get_anime_episode_download_link, CannotDownloadAnimeException
-from faunadb.client import FaunaClient
+from app_config import config, client, updater, users, anime_by_title, animes, all_users_by_anime, scraper, log_error, sort_anime_by_followers, logger, anime_by_id
+from scraping import GGAScraper, KAScraper, CannotDownloadAnimeException
 from faunadb import query as q, errors
 from faunadb.objects import Ref, FaunaTime
 from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackQueryHandler, Filters, CallbackContext, Job, JobQueue
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from dotenv import load_dotenv
-import json
-from custom_logging import Logger
 from telegram.error import TelegramError, Unauthorized, BadRequest, TimedOut, ChatMigrated, NetworkError
 from multiprocessing import Pool
 from threading import Thread
@@ -15,107 +13,100 @@ from typing import Union
 from my_workaround import send_broadcast
 from shorten_link import shorten
 import datetime
+from models import User
 
-
+# load environment variables
 load_dotenv()
 
 # setting up telegram stuff
-updater = Updater(token=os.getenv('TELEGRAM_TOKEN'))
 dispatcher = updater.dispatcher
 job_queue = updater.job_queue
 
-# setting up fauna stuff
-client = FaunaClient(secret=os.getenv('FAUNA_SERVER_SECRET'))
-users = 'users'
-animes = 'animes'
-all_users_by_anime = 'all_users_by_anime'
-anime_by_title = 'all_animes_by_title'
-sort_anime_by_followers = 'sort_animes_by_followers'
+def get_subscribed_users_for_anime(anime_doc_id):
+    subscribed_users = []
+    subscribed_users = client.query(
+        q.map_(
+            q.lambda_('doc_ref', q.get(q.var('doc_ref'))),
+            q.paginate(q.match(q.index(all_users_by_anime), q.ref(q.collection(animes),str(anime_doc_id))))
+        )
+    )
+    subscribed_users = subscribed_users['data']
+    return subscribed_users
 
-# setting up config file
-config = {}
-with open('config.json', 'r') as f:
-    config = json.load(f)
 
-# setting up custom logger
-logger = Logger(config['app_log_path'])
-def log_error(error: Exception, log_to_admin_telegram=True):
-    error_message = 'An error occurred: '+str(error)
-    logger.write(error_message)
-    if log_to_admin_telegram:
-        dispatcher.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text=error_message)
+def send_update_to_subscribed_users(anime_info, anime, download_link=None):
+    if type(anime) == type({'dict':'0'}):
+        pass
+    elif type(anime) == type('str') or type(anime) == type(0):
+        anime = client.query(
+            q.get(q.ref(q.collection(animes), str(anime)))
+        )
+
+    if anime_info['number_of_episodes'] > anime['data']['episodes']:
+        if anime_info['latest_episode_link'] != anime['data']['last_episode']['link']:
+            try:
+                if download_link != None:
+                    download_link = shorten(scraper.get_download_link(anime_info['latest_episode_link']))
+                else:
+                    pass
+            except CannotDownloadAnimeException:
+                subscribed_users = get_subscribed_users_for_anime(anime['ref'].id())
+                # tell subscribed user episode is available but can't download
+                for user in subscribed_users:
+                    text = "A new episode for {0}: {1} is now out.\nSadly, I could not download it\U0001F622".format(anime['data']['title'],anime_info['latest_episode_title'])
+                    updater.bot.send_message(chat_id=int(user['ref'].id()), text=text)
+                #send message to admin
+                updater.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text=anime['data']['title']+' just got a new episode but could not be downloaded')
+            else:
+                subscribed_users = get_subscribed_users_for_anime(anime['ref'].id())
+                
+                markup = [[InlineKeyboardButton(text='Download', url=download_link)]]
+                #send message to subscribed users
+                for user in subscribed_users:
+                    text = "Here's the latest episode for {0}:\n\n{1}".format(anime['data']['title'],anime_info['latest_episode_title'])
+                    updater.bot.send_message(chat_id=int(user['ref'].id()), text=text, reply_markup=InlineKeyboardMarkup(markup))
+                #send message to admin
+                updater.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text=anime['data']['title']+' just got a new episode and was updated!')
+                logger.write(str(len(subscribed_users))+ " users were notified of an update to "+anime['data']['title'])
+            finally:
+                # update anime in db after sending messages to users
+                client.query(
+                    q.update(
+                        anime['ref'],
+                        {
+                            'data':{
+                                'episodes': anime_info['number_of_episodes'],
+                                'last_episode': {
+                                    'title': anime_info['latest_episode_title'],
+                                    'link': anime_info['latest_episode_link']
+                                }
+                            }
+                        }
+                    )
+                )
+            
+        else:
+            pass
     else:
         pass
-
-def is_admin(chat_id: Union[str, int]) -> bool:
-    if str(chat_id) == str(os.getenv('ADMIN_CHAT_ID')):
-        return True
-    return False
+    
+    
+    
 
 def run_cron():
+    print('running')
     def check_for_update(context: CallbackContext):
-        context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text='About to run subscription check!')
+        print('about to run subscription check')
+        updater.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'),text='About to run subscription check!')
         #get all anime
-        all_animes = client.query(
-            q.map_(
-                q.lambda_('doc_ref', q.get(q.var('doc_ref'))),
-                q.paginate(q.documents(q.collection(animes)))
-            )   
+        all_animes = client.query(  
+            q.paginate(q.documents(q.collection(animes))) 
         )
 
         for anime in all_animes['data']:
-            print(anime)
-            episodes = get_anime_episodes(anime['data']['link'])
-            print(len(episodes))
+            anime_info = scraper.get_anime_info(anime['data']['link'])
             #if there are new episodes...
-            if len(episodes) > anime['data']['episodes']:
-                if episodes[0] != anime['data']['last_episode']:
-                    subscribed_users = client.query(
-                        q.map_(
-                            q.lambda_('doc_ref', q.get(q.var('doc_ref'))),
-                            q.paginate(q.match(q.index(all_users_by_anime), anime['ref']))
-                        )
-                    )
-
-                    subscribed_users = subscribed_users['data']
-
-                    #get download link for new anime
-                    try:
-                        download_link = shorten(get_anime_episode_download_link(episodes[0]['link']))
-                    except CannotDownloadAnimeException:
-                        # tell subscribed user episode is available but can't download
-                        for user in subscribed_users:
-                            text = "A new episode for {0}: {1} is now out.\nSadly, I could not download it\U0001F622".format(anime['data']['title'],episodes[0]['title'])
-                            context.bot.send_message(chat_id=int(user['ref'].id()), text=text)
-                        #send message to admin
-                        context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text=anime['data']['title']+' just got a new episode but could not be downloaded')
-                    else:
-                        markup = [[InlineKeyboardButton(text='Download', url=download_link)]]
-                        #send message to subscribed users
-                        for user in subscribed_users:
-                            print('sent to subscribed user')
-                            text = "Here's the latest episode for {0}:\n\n{1}".format(anime['data']['title'],episodes[0]['title'])
-                            
-                            context.bot.send_message(chat_id=int(user['ref'].id()), text=text, reply_markup=InlineKeyboardMarkup(markup))
-                        #send message to admin
-                        context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text=anime['data']['title']+' just got a new episode and was updated!')
-                    finally:
-                        # update anime in db after sending messages to users
-                        client.query(
-                            q.update(
-                                anime['ref'],
-                                {
-                                    'data':{
-                                        'episodes': len(episodes),
-                                        'last_episode': episodes[0]
-                                    }
-                                }
-                            )
-                        )
-                else:
-                    pass
-            else:
-                pass
+            send_update_to_subscribed_users(anime_info, anime.id())
 
         context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text='Subscription check finished!')
     try:
@@ -130,243 +121,114 @@ def run_cron():
 def plain_message(update: Update, context:CallbackContext):
     print(update.effective_message)
     bot_user = client.query(q.get(q.ref(q.collection('users'), update.effective_chat.id)))
-    chat_id = int(bot_user['ref'].id())
+    user = User(update.effective_chat.id)
     last_command = bot_user['data']['last_command']
     message = update.message.text
 
     print(last_command)
 
-    if last_command == 'watch':
+    if last_command == 'subscribe':
         try: 
-            search_results = get_anime(message, limit=15)
-
+            search_results = scraper.get_anime(message, limit=15)
             if len(search_results) == 0:
-                context.bot.send_message(chat_id=chat_id, text='Sorry but no search results were available for this anime')
+                context.bot.send_message(chat_id=user.chat_id, text='Sorry but no search results were available for this anime')
             else:
-                context.bot.send_message(chat_id=chat_id, text='Here are the search results for '+message)
+                context.bot.send_message(chat_id=user.chat_id, text='Here are the search results for '+message)
                 for result in search_results:
-                    markup = [[InlineKeyboardButton('Select', callback_data='watch='+shorten(result['link']))]]
-                    context.bot.send_photo(chat_id=chat_id, photo=result['thumbnail'], caption=result['title'], timeout=5, reply_markup=InlineKeyboardMarkup(markup))
+                    markup = [[InlineKeyboardButton('Select', callback_data='subscribe='+shorten(result['link']))]]
+                    context.bot.send_photo(chat_id=user.chat_id, photo=result['thumbnail'], caption=result['title'], timeout=5, reply_markup=InlineKeyboardMarkup(markup))
                     
             #update last command
-            client.query(
-                q.update(
-                    q.ref(q.collection(users), chat_id),
-                    {
-                        'data': {
-                            'last_command': '',
-                        }
-                    }
-                )
-            )        
+            user.update_last_command('')
+
         except Exception as err:
             log_error(err)
+
     elif last_command == 'getlatest':
         try: 
-            search_results = get_anime(message, limit=15)
+            search_results = scraper.get_anime(message, limit=15)
 
             if len(search_results) == 0:
-                context.bot.send_message(chat_id=chat_id, text='Sorry but no search results were available for this anime')
+                context.bot.send_message(chat_id=user.chat_id, text='Sorry but no search results were available for this anime')
             else:
-                context.bot.send_message(chat_id=chat_id, text='Here are the search results for '+message)
+                context.bot.send_message(chat_id=user.chat_id, text='Here are the search results for '+message)
                 for result in search_results:
-                    print(result['link'])
-
-                    
                     markup = [[InlineKeyboardButton('Select', callback_data='getlatest='+shorten(result['link']))]]
-                    context.bot.send_photo(chat_id=chat_id, photo=result['thumbnail'], caption=result['title'], timeout=5, reply_markup=InlineKeyboardMarkup(markup))
-                    
+                    context.bot.send_photo(chat_id=user.chat_id, photo=result['thumbnail'], caption=result['title'], timeout=5, reply_markup=InlineKeyboardMarkup(markup))  
             #update last command
-            client.query(
-                q.update(
-                    q.ref(q.collection(users), chat_id),
-                    {
-                        'data': {
-                            'last_command': ''
-                        }
-                    }
-                )
-            )        
+            user.update_last_command('')        
         except Exception as err:
             log_error(err)
+
     elif last_command == 'broadcast':
-        if is_admin(chat_id):
+        if user.is_admin():
             print('is_admin')
-            context.bot.send_message(chat_id=chat_id, text='Broadcasting message...')
+            context.bot.send_message(chat_id=user.chat_id, text='Broadcasting message...')
             try: 
                 results = client.query(
                     q.paginate(q.documents(q.collection(users)))
                 )
                 results = results['data']
-                print(results[0].id())
 
                 #spin 5 processes
                 with Pool(5) as p:
                     p.map(send_broadcast, [[int(user_ref.id()), message] for user_ref in results])
-
-                client.query(
-                    q.update(
-                        q.ref(q.collection(users), chat_id),
-                        {
-                            'last_command': ''
-                        }
-                    )
-                )
+                #update user last command
+                user.update_last_command('')
             except Exception as err:
                 log_error(err)
         else:
-            context.bot.send_message(chat_id=chat_id, text="Only admins can use this command!")
+            context.bot.send_message(chat_id=user.chat_id, text="Only admins can use this command!")
     else:
-        context.bot.send_message(chat_id=chat_id, text="Sorry, I do not understand what you mean.\nPlease use the /help command to discover what I can helep you with.")
+        context.bot.send_message(chat_id=user.chat_id, text="Sorry, I do not understand what you mean.\nPlease use the /help command to discover what I can helep you with.")
 
 def callback_handler_func(update: Update, context: CallbackContext):
-    chat_id = update.effective_chat.id
-    print(update)
+    user = User(update.effective_chat.id)
     callback_message = update.callback_query.message.reply_markup.inline_keyboard[0][0].callback_data
     
     
     [command, payload] = callback_message.split(sep='=')
 
-    if command == 'watch':
-        try:
-            title = update.callback_query.message.caption
-            print(title)
-            if title == None:
-                title = '.'.join(update.effective_message.text.split(sep='.')[1:]).strip()
-            
-            #create a new anime document
-            
-            episodes = get_anime_episodes(payload)
-            anime = client.query(
-                q.create(
-                    q.collection(animes),
-                    {
-                        'data': {
-                            'title': title,
-                            'followers': 0,
-                            'link': payload,
-                            'episodes': len(episodes),
-                            'last_episode':episodes[0] ,
-                        }
-                    }
-                )
-            )
+    if command == 'subscribe':
+        user.subscribe_to_anime(payload)
+    elif command == 'unsubscribe':
+        user.unsubscribe_from_anime(payload)
 
-        except Exception as err:
-            anime = client.query(  
-                q.get(q.match(q.index(anime_by_title), title))
-            )
-            print(anime)        
-        #update user's watch list
-        try:
-            result = client.query(
-                q.let(
-                    {
-                        'user_anime_list': q.select(
-                            ['data', 'animes_watching'],
-                            q.get(q.ref(q.collection(users), chat_id))
-                        ) 
-                    },
-
-                    q.if_(
-                        q.contains_value(anime['ref'], q.var('user_anime_list')),
-                        'This anime is already on your watch list!',
-                        q.do(
-                            q.update(
-                                q.ref(q.collection(users), chat_id),
-                                {
-                                    'data': {
-                                        'animes_watching': q.append(q.var('user_anime_list'), [anime['ref']])
-                                    }
-                                }
-                            ),
-                            q.update(
-                                anime['ref'],
-                                {
-                                    'data': {
-                                        'followers': q.add(
-                                            q.select(['data', 'followers'], q.get(anime['ref'])),
-                                            1
-                                        )
-                                    }
-                                }
-                            )
-                        )
-                        
-                    )
-
-                )
-            )
-
-            if type(result) is str:
-                context.bot.send_message(chat_id=chat_id, text=result)
-            else:
-                context.bot.send_message(chat_id=chat_id, text='You are now listening for updates on '+title)
-        except Exception as err:
-            log_error(err)
-
-    elif command == 'unwatch':
-        try:
-            client.query(
-                q.let(
-                    {
-                        'anime_ref': q.ref(q.collection(animes), payload),
-                        'bot_user': q.ref(q.collection(users), chat_id),
-                        'followers': q.select(['data', 'followers'], q.get(q.var('anime_ref'))),
-                        
-                    },
-                    q.do(
-                        q.update(
-                            q.var('anime_ref'),
-                            {
-                                'data':{
-                                    'followers': q.subtract(
-                                        q.var('followers'),
-                                        1
-                                    )
-                                }
-                            }
-                        ),
-                        q.update(
-                            q.var('bot_user'),
-                            {
-                                'data': {
-                                    'animes_watching': q.filter_(
-                                        q.lambda_('watched_anime_ref', q.not_(q.equals(q.var('watched_anime_ref'), q.var('anime_ref')))),
-                                        q.select(['data', 'animes_watching'], q.get(q.var('bot_user')))
-                                    )
-                                }
-                            }
-                        ),
-                        q.if_(
-                            q.equals(q.var('followers'), 1),
-                            q.delete(q.var('anime_ref')),
-                            'successful!'
-                        )
-                    )
-                )
-            )
-
-            context.bot.send_message(chat_id=chat_id, text='You have stopped following '+update.callback_query.message.text)
-        except Exception as err:
-            log_error(err)
-
+    #TODO: test this
     elif command == 'getlatest':
         try:
-            episodes = get_anime_episodes(payload)
-            latest_episode_download_link = shorten(get_anime_episode_download_link(episodes[0]['link']))
+            anime_info = scraper.get_anime_info(payload)
+                
+            latest_episode_download_link = shorten(scraper.get_download_link(anime_info['latest_episode_link']))
             markup = [[InlineKeyboardButton(text='Download', url=latest_episode_download_link)]]
-            context.bot.send_message(chat_id=chat_id, text=episodes[0]['title'], reply_markup=InlineKeyboardMarkup(markup))
+            context.bot.send_message(chat_id=user.chat_id, text=anime_info['latest_episode_title'], reply_markup=InlineKeyboardMarkup(markup))
         except CannotDownloadAnimeException as err:
             log_error(err, log_to_admin_telegram=False)
-            context.bot.send_message(chat_id=chat_id, text="Sorry,"+episodes[0]['title']+" could not be downloaded at this time!")
-            context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text='A user tried to download '+episodes[0]['title']+" but could not due to error: "+str(err))
+            context.bot.send_message(chat_id=user.chat_id, text="Sorry,"+anime_info['latest_episode_title']+" could not be downloaded at this time!")
+            context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text='A user tried to download '+anime_info['latest_episode_title']+" but could not due to error: "+str(err))
         except Exception as err:
             log_error(err) 
+
+        #check if anime is in our anime registry
+        anime_from_db = client.query(
+            q.let(
+                {
+                    'anime': q.get(q.match(q.index(anime_by_id), anime_info['anime_id'])),
+                },
+                q.if_(
+                    q.is_null(q.var('anime')),
+                    None,
+                    q.var('anime')
+                )
+            )
+        )
+
+        if anime_from_db != None:
+            send_update_to_subscribed_users(anime_info,anime_from_db, latest_episode_download_link)
     else:
         pass
 
-def watch(update, context):
+def subscribe(update, context):
     chat_id = update.effective_chat.id
 
     try:
@@ -377,7 +239,7 @@ def watch(update, context):
                     q.ref(q.collection(users), chat_id),
                     {
                         'data': {
-                            'last_command': 'watch'
+                            'last_command': 'subscribe'
                         }
                     }
                 ),
@@ -387,7 +249,7 @@ def watch(update, context):
                         'data': {
                             'name': update.message.chat.first_name,
                             'is_admin': False,
-                            'last_command': 'watch',
+                            'last_command': 'subscribe',
                             'animes_watching': []
                         }
                     }
@@ -399,13 +261,14 @@ def watch(update, context):
     except Exception as err:
         log_error(err)
 
-def unwatch(update: Update, context: CallbackContext):
-    chat_id = update.effective_chat.id
+def unsubscribe(update: Update, context: CallbackContext):
+    user = User(update.effective_chat.id)
+    #TODO: TEST THE UNSUBSCRIBE COMMAND WHEN THE USER IS NOT FOLLWOWING ANY ANIME
     try:
         animes_watched = client.query(
             q.let(
                 {
-                    'bot_user': q.ref(q.collection(users), chat_id)
+                    'bot_user': q.ref(q.collection(users), user.chat_id)
                 },
                 q.if_(
                     q.exists(q.var('bot_user')),
@@ -413,34 +276,21 @@ def unwatch(update: Update, context: CallbackContext):
                         q.lambda_('doc_ref', q.get(q.var('doc_ref'))),
                         q.select(['data', 'animes_watching'], q.get(q.var('bot_user')))
                     ),
-                    'You are currently not subscribed to any anime'
+                    []
                 )
             )
             
         )
 
-        if type(animes_watched) is str:
-            context.bot.send_message(chat_id=chat_id,text=animes_watched)
-        
-        else:
-            for anime in animes_watched:
-                markup = [[InlineKeyboardButton('Unwatch', callback_data='unwatch='+anime['ref'].id())]]
-                context.bot.send_message(chat_id=chat_id, text=anime['data']['title'], reply_markup=InlineKeyboardMarkup(markup))
+        for anime in animes_watched:
+            markup = [[InlineKeyboardButton('Unsubscribe', callback_data='unsubscribe='+anime['ref'].id())]]
+            context.bot.send_message(chat_id=user.chat_id, text=anime['data']['title'], reply_markup=InlineKeyboardMarkup(markup))
 
-            #update last command
-            client.query(
-                q.update(
-                    q.ref(q.collection(users), chat_id),
-                    {
-                        'data': {
-                            'last_command': ''
-                        }
-                    }
-                )
-            ) 
+        #update last command
+        user.update_last_command('')
 
         if animes_watched == []:
-            context.bot.send_message(chat_id=chat_id,text='You are currently not subscribed to any anime')
+            context.bot.send_message(chat_id=user.chat_id,text='You are currently not subscribed to any anime')
     except Exception as err:
         log_error(err)
 
@@ -476,18 +326,18 @@ def get_latest(update: Update, context: CallbackContext):
         log_error(err)
 
 def help(update, context):
-    chat_id = update.effective_chat.id
+    user = User(update.effective_chat.id)
     message = ''
-    if is_admin(chat_id):
+    if str(user.chat_id) == str(os.getenv('ADMIN_CHAT_ID')):
         message = config['message']['help_admin']
     else:
         message = config['message']['help']
-    context.bot.send_message(chat_id=chat_id, text=message)
+    context.bot.send_message(chat_id=user.chat_id, text=message)
     try:
         client.query(
             q.let(
                 {
-                    'user': q.ref(q.collection(users), update.effective_chat.id)
+                    'user': q.ref(q.collection(users), user.chat_id)
                 },
                 q.if_(
                     q.exists(q.var('user')),
@@ -538,16 +388,11 @@ def error_handler(update: Update, context: CallbackContext):
         raise context.error
     except Unauthorized as err:
         # user has blocked bot
-        # set user active status to false
+        # delete user from list
         log_error(err)
         client.query(
-            q.update(
-                q.ref(q.collection(animes), update.effective_chat.id),
-                {
-                    'data': {
-                        'active': False
-                    }
-                }
+            q.delete(
+                q.ref(q.collection(users), update.effective_chat.id),
             )
         )
     except BadRequest as err:
@@ -583,12 +428,12 @@ def recommend(update: Update, context: CallbackContext):
             link = anime['data']['link']
         else:
             link = shorten(anime['data']['link'])
-        markup = [[InlineKeyboardButton('Watch', callback_data='watch='+link)]]
+        markup = [[InlineKeyboardButton('Subscribe', callback_data='subscribe='+link)]]
         context.bot.send_message(chat_id=chat_id, reply_markup=InlineKeyboardMarkup(markup),text=str(results['data'].index(anime)+1)+'. '+anime['data']['title'])
 
 def number_of_users(update: Update, context: CallbackContext):
-    chat_id = update.effective_chat.id
-    if is_admin(chat_id):
+    user = User(update.effective_chat.id)
+    if user.is_admin():
         result = client.query(
             q.count(
                 q.paginate(
@@ -598,11 +443,11 @@ def number_of_users(update: Update, context: CallbackContext):
                 )
             )
         )
-        context.bot.send_message(chat_id=chat_id, text='Number of users: '+str(result['data'][0]))
+        context.bot.send_message(chat_id=user.chat_id, text='Number of users: '+str(result['data'][0]))
 
 def number_of_anime(update: Update, context: CallbackContext):
-    chat_id = update.effective_chat.id
-    if is_admin(chat_id):
+    user = User(update.effective_chat.id)
+    if user.is_admin():
         result = client.query(
             q.count(
                 q.paginate(
@@ -612,29 +457,20 @@ def number_of_anime(update: Update, context: CallbackContext):
                 ) 
             )
         )
-        context.bot.send_message(chat_id=chat_id, text='Number of anime: '+str(result['data'][0]))
+        context.bot.send_message(chat_id=user.chat_id, text='Number of anime: '+str(result['data'][0]))
 
 def broadcast(update: Update, context: CallbackContext):
-    chat_id = update.effective_chat.id
-    if is_admin(chat_id):
-        context.bot.send_message(chat_id=chat_id, text='Enter the message you want to broadcast')
-        client.query(
-            q.update(
-                q.ref(q.collection(users), chat_id),
-                {
-                    'data':{
-                        'last_command': 'broadcast'
-                    }
-                }
-            )
-        )
+    user = User(update.effective_chat.id)
+    if user.is_admin():
+        context.bot.send_message(chat_id=user.chat_id, text='Enter the message you want to broadcast')
+        user.update_last_command('broadcast')
     else:
-        context.bot.send_message(chat_id=chat_id, text='Only admins can use this command!')
+        context.bot.send_message(chat_id=user.chat_id, text='Only admins can use this command!')
     
 
 
-watch_handler = CommandHandler('watch', watch)
-unwatch_handler = CommandHandler('unwatch', unwatch)
+watch_handler = CommandHandler('subscribe', subscribe)
+unwatch_handler = CommandHandler('unsubscribe', unsubscribe)
 help_handler = CommandHandler(['help', 'start'], help)
 donate_handler = CommandHandler('donate', donate)
 message_handler = MessageHandler(Filters.text & (~Filters.command), plain_message)
@@ -662,12 +498,9 @@ dispatcher.add_error_handler(error_handler)
 
 
 if __name__ == '__main__':
+    print('started')
     updater.start_polling()
     run_cron()
-
-#todo:
-#Broadcast feature
-#make broadcast and run_cron functions run on a separate thread
-
+    
 
 
