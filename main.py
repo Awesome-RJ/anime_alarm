@@ -65,12 +65,23 @@ def send_update_to_subscribed_users(anime, download_link=None, anime_info=None):
                 
                 markup = [[InlineKeyboardButton(text='Download', url=download_link)]]
                 #send message to subscribed users
-                for user in subscribed_users:
-                    text = "Here's the latest episode for {0}:\n\n{1}".format(anime['data']['title'],anime_info['latest_episode_title'])
-                    updater.bot.send_message(chat_id=int(user['ref'].id()), text=text, reply_markup=InlineKeyboardMarkup(markup))
-                #send message to admin
-                updater.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text=anime['data']['title']+' just got a new episode and was updated!')
-                logger.write(str(len(subscribed_users))+ " users were notified of an update to "+anime['data']['title'])
+                try:
+                    for user in subscribed_users:
+                        text = "Here's the latest episode for {0}:\n\n{1}".format(anime['data']['title'],anime_info['latest_episode_title'])
+                        updater.bot.send_message(chat_id=int(user['ref'].id()), text=text, reply_markup=InlineKeyboardMarkup(markup))
+                    #send message to admin
+                    updater.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text=anime['data']['title']+' just got a new episode and was updated!')
+                    logger.write(str(len(subscribed_users))+ " users were notified of an update to "+anime['data']['title'])
+                except Unauthorized as err:
+                    # user has blocked bot
+                    # delete user from list
+                    log_error(err)
+                    client.query(
+                        q.delete(
+                            user['ref'],
+                        )
+                    )
+                    logger.write(user['data']['first_name'] + " has been deleted from user list")
             finally:
                 # update anime in db after sending messages to users
                 client.query(
@@ -391,15 +402,6 @@ def error_handler(update: Update, context: CallbackContext):
     context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text='An error occurred. Check app log file')
     try:
         raise context.error
-    except Unauthorized as err:
-        # user has blocked bot
-        # delete user from list
-        log_error(err)
-        client.query(
-            q.delete(
-                q.ref(q.collection(users), update.effective_chat.id),
-            )
-        )
     except BadRequest as err:
         # handle malformed requests - read more below!
         log_error(err)
