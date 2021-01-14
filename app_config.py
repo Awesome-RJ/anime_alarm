@@ -23,7 +23,7 @@ config = {
 }
 
 client = FaunaClient(secret=os.getenv('FAUNA_SERVER_SECRET'))
-updater = Updater(token=os.getenv('TELEGRAM_TOKEN'))
+updater = Updater(token=os.getenv('TELEGRAM_TOKEN'), use_context=True)
 
 # setting up fauna stuff
 users = 'users'

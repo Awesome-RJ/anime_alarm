@@ -94,10 +94,9 @@ def send_update_to_subscribed_users(anime, download_link=None, anime_info=None):
         pass
     
     
-    
-
 def run_cron():
     print('running')
+    
     def check_for_update(context: CallbackContext):
         print('about to run subscription check')
         updater.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'),text='About to run subscription check!')
@@ -115,7 +114,7 @@ def run_cron():
     try:
         # run job every 4 hours
         # this automatically runs in a separate thread so no wahala
-        job_queue.run_repeating(check_for_update, interval=14400, first=datetime.datetime.now() + datetime.timedelta(seconds=30))
+        job_queue.run_repeating(check_for_update, interval=14400, first=datetime.datetime.now() + datetime.timedelta(seconds=5))
     except Exception as err:
         log_error(err)
 
@@ -123,7 +122,10 @@ def run_cron():
 
 def plain_message(update: Update, context:CallbackContext):
     print(update.effective_message)
-    bot_user = client.query(q.get(q.ref(q.collection('users'), update.effective_chat.id)))
+    try:
+        bot_user = client.query(q.get(q.ref(q.collection('users'), update.effective_chat.id)))
+    except errors.NotFound:
+        context.bot.send_message(chat_id=update.effective_chat.id,text='Sorry, I do not understand what you mean.\nPlease use the /help command to discover what I can help you with.')
     user = User(update.effective_chat.id)
     last_command = bot_user['data']['last_command']
     message = update.message.text
@@ -183,7 +185,7 @@ def plain_message(update: Update, context:CallbackContext):
         else:
             context.bot.send_message(chat_id=user.chat_id, text="Only admins can use this command!")
     else:
-        context.bot.send_message(chat_id=user.chat_id, text="Sorry, I do not understand what you mean.\nPlease use the /help command to discover what I can helep you with.")
+        context.bot.send_message(chat_id=user.chat_id, text="Sorry, I do not understand what you mean.\nPlease use the /help command to discover what I can help you with.")
 
 def callback_handler_func(update: Update, context: CallbackContext):
     user = User(update.effective_chat.id)
