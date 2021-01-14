@@ -34,18 +34,21 @@ def get_subscribed_users_for_anime(anime_doc_id):
     return subscribed_users
 
 
-def send_update_to_subscribed_users(anime_info, anime, download_link=None):
+def send_update_to_subscribed_users(anime, download_link=None, anime_info=None):
     if type(anime) == type({'dict':'0'}):
         pass
     elif type(anime) == type('str') or type(anime) == type(0):
         anime = client.query(
             q.get(q.ref(q.collection(animes), str(anime)))
         )
+    
+    if anime_info == None:
+        anime_info = scraper.get_anime_info(anime['data']['link'])
 
     if anime_info['number_of_episodes'] > anime['data']['episodes']:
         if anime_info['latest_episode_link'] != anime['data']['last_episode']['link']:
             try:
-                if download_link != None:
+                if download_link == None:
                     download_link = shorten(scraper.get_download_link(anime_info['latest_episode_link']))
                 else:
                     pass
@@ -104,9 +107,9 @@ def run_cron():
         )
 
         for anime in all_animes['data']:
-            anime_info = scraper.get_anime_info(anime['data']['link'])
+            #get anime_info in the function send_update...
             #if there are new episodes...
-            send_update_to_subscribed_users(anime_info, anime.id())
+            send_update_to_subscribed_users(anime.id())
 
         context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text='Subscription check finished!')
     try:
@@ -224,7 +227,7 @@ def callback_handler_func(update: Update, context: CallbackContext):
         )
 
         if anime_from_db != None:
-            send_update_to_subscribed_users(anime_info,anime_from_db, latest_episode_download_link)
+            send_update_to_subscribed_users(anime_from_db, download_link=latest_episode_download_link,anime_info=anime_info)
     else:
         pass
 
