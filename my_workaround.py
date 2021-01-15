@@ -1,6 +1,9 @@
 import os
 from telegram.ext import Updater
 from dotenv import load_dotenv
+from telegram.error import Unauthorized
+from faunadb import query as q, errors
+from app_config import client, users, logger
 
 
 load_dotenv()
@@ -9,4 +12,17 @@ load_dotenv()
 updater = Updater(token=os.getenv('TELEGRAM_TOKEN'))
 
 def send_broadcast(args):
-    updater.dispatcher.bot.send_message(chat_id=args[0], text=args[1])
+    try:
+        updater.bot.send_message(chat_id=args[0], text=args[1])
+        
+    except Unauthorized:
+        #user blocked bot so delete user from list
+        user = client.query(
+            q.get(q.ref(q.collection(users), args[0]))
+        )
+        client.query(
+            q.delete(
+                user['ref'],
+            )
+        )
+        logger.write(user['data']['first_name'] + " has been deleted from user list")

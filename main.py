@@ -75,7 +75,6 @@ def send_update_to_subscribed_users(anime, download_link=None, anime_info=None):
                 except Unauthorized as err:
                     # user has blocked bot
                     # delete user from list
-                    log_error(err)
                     client.query(
                         q.delete(
                             user['ref'],
