@@ -31,7 +31,4 @@ def shorten(link:str) -> str:
         return shortened_link
     
 
-try:
-    shortener.bitly.short('https://bit.ly/3nWQZ9L')
-except Exception as err:
-    print(str(err))
+

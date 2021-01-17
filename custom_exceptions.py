@@ -11,9 +11,9 @@ class CannotGetAnimeInfoException(Exception):
     def __init__(self, anime, base_err:Exception):
         self.anime = anime
         self.base_err = base_err
-        super().__init__(anime+"'s info could not be retrieved")
+        super().__init__(anime+" info could not be retrieved")
     def __str__(self):
-        return self.anime+"'s info could not be retrieved: "+str(self.base_err)
+        return self.anime+" info could not be retrieved: "+str(self.base_err)
 
 
 class UserNotFoundException(Exception):
