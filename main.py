@@ -89,7 +89,7 @@ def send_update_to_subscribed_users(anime, download_link=None, anime_info=None):
                             user['ref'],
                         )
                     )
-                    logger.write(user['data']['first_name'] + " has been deleted from user list")
+                    logger.write("A user has been deleted from user list")
             finally:
                 # update anime in db after sending messages to users
                 client.query(
