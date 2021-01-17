@@ -14,6 +14,15 @@ from my_workaround import send_broadcast
 from shorten_link import shorten
 import datetime
 from models import User
+import sentry_sdk
+
+#set up sentry
+sentry_sdk.init(
+    "https://bc6863c9bd174d5a8cd5f95f6d45f4b0@o462758.ingest.sentry.io/5595618",
+    traces_sample_rate=1.0
+)
+
+
 
 # load environment variables
 load_dotenv()
@@ -124,7 +133,7 @@ def run_cron():
     try:
         # run job every 4 hours
         # this automatically runs in a separate thread so no wahala
-        job_queue.run_repeating(check_for_update, interval=14400, first=datetime.datetime.now() + datetime.timedelta(seconds=5))
+        job_queue.run_repeating(check_for_update, interval=7200, first=datetime.datetime.now() + datetime.timedelta(seconds=5))
     except Exception as err:
         log_error(err)
 
