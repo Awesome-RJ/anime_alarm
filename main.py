@@ -398,7 +398,6 @@ def donate(update, context):
         log_error(err)  
     
 def error_handler(update: Update, context: CallbackContext):
-    context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text='An error occurred. Check app log file')
     try:
         raise context.error
     except BadRequest as err:
@@ -415,6 +414,8 @@ def error_handler(update: Update, context: CallbackContext):
         log_error(err)
     except TelegramError:
         # handle all other telegram related errors
+        log_error(err)
+    except Exception as err:
         log_error(err)
 
 def recommend(update: Update, context: CallbackContext):
