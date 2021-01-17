@@ -231,24 +231,24 @@ def callback_handler_func(update: Update, context: CallbackContext):
             context.bot.send_message(chat_id=user.chat_id, text="Sorry,"+anime_info['latest_episode_title']+" could not be downloaded at this time!")
             context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text='A user tried to download '+anime_info['latest_episode_title']+" but could not due to error: "+str(err))
         except Exception as err:
-            log_error(err) 
-
-        #check if anime is in our anime registry
-        anime_from_db = client.query(
-            q.let(
-                {
-                    'anime': q.get(q.match(q.index(anime_by_id), anime_info['anime_id'])),
-                },
-                q.if_(
-                    q.is_null(q.var('anime')),
-                    None,
-                    q.var('anime')
+            log_error(err)
+        finally: 
+            #check if anime is in our anime registry
+            anime_from_db = client.query(
+                q.let(
+                    {
+                        'anime': q.get(q.match(q.index(anime_by_id), anime_info['anime_id'])),
+                    },
+                    q.if_(
+                        q.is_null(q.var('anime')),
+                        None,
+                        q.var('anime')
+                    )
                 )
             )
-        )
 
-        if anime_from_db != None:
-            send_update_to_subscribed_users(anime_from_db, download_link=latest_episode_download_link,anime_info=anime_info)
+            if anime_from_db != None:
+                send_update_to_subscribed_users(anime_from_db, download_link=latest_episode_download_link,anime_info=anime_info)
     else:
         pass
 
