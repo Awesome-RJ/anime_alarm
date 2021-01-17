@@ -242,7 +242,11 @@ def callback_handler_func(update: Update, context: CallbackContext):
                     q.if_(
                         q.is_null(q.var('anime')),
                         None,
-                        q.var('anime')
+                        q.if_(
+                            q.gt(anime_info['number_of_episodes'],q.select(['data', 'episodes'], q.var('anime'))),
+                            q.var('anime'),
+                            None
+                        )
                     )
                 )
             )
