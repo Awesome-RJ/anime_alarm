@@ -4,7 +4,7 @@ from custom_exceptions import UserNotFoundException
 
 class User:
     def __init__(self, chat_id):
-        self.chat_id = chat_id
+        self.chat_id = str(chat_id)
 
     def is_admin(self) -> bool:
         try:
