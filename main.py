@@ -235,20 +235,22 @@ def callback_handler_func(update: Update, context: CallbackContext):
         finally: 
             #check if anime is in our anime registry
             anime_from_db = client.query(
-                q.let(
-                    {
-                        'anime': q.get(q.match(q.index(anime_by_id), anime_info['anime_id'])),
-                    },
+            
                     q.if_(
-                        q.is_null(q.var('anime')),
+                        q.is_null(q.get(q.match(q.index(anime_by_id), anime_info['anime_id']))),
                         None,
-                        q.if_(
-                            q.gt(anime_info['number_of_episodes'],q.select(['data', 'episodes'], q.var('anime'))),
-                            q.var('anime'),
-                            None
+                        q.let(
+                            {
+                                'anime': q.get(q.match(q.index(anime_by_id), anime_info['anime_id']))
+                            },
+                            q.if_(
+                                q.gt(anime_info['number_of_episodes'],q.select(['data', 'episodes'], q.var('anime'))),
+                                q.var('anime'),
+                                None
+                            )
                         )
                     )
-                )
+                
             )
 
             if anime_from_db != None:
