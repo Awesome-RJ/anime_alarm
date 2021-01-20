@@ -427,7 +427,7 @@ def error_handler(update: Update, context: CallbackContext):
     except ChatMigrated as err:
         # the chat_id of a group has changed, use e.new_chat_id instead
         log_error(err)
-    except TelegramError:
+    except TelegramError as err:
         # handle all other telegram related errors
         log_error(err)
     except Exception as err:
