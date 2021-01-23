@@ -234,8 +234,8 @@ def callback_handler_func(update: Update, context: CallbackContext):
             log_error(err)
         finally: 
             #check if anime is in our anime registry
-            anime_from_db = client.query(
-            
+            try:
+                anime_from_db = client.query(
                     q.if_(
                         q.is_null(q.get(q.match(q.index(anime_by_id), anime_info['anime_id']))),
                         None,
@@ -249,10 +249,10 @@ def callback_handler_func(update: Update, context: CallbackContext):
                                 None
                             )
                         )
-                    )
-                
-            )
-
+                    )  
+                )
+            except errors.NotFound:
+                anime_from_db = None
             if anime_from_db != None:
                 send_update_to_subscribed_users(anime_from_db, download_link=latest_episode_download_link,anime_info=anime_info)
     else:
