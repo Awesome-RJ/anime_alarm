@@ -1,12 +1,14 @@
 from pyshorteners import Shortener, exceptions
 from dotenv import load_dotenv
+from requests import ReadTimeout
 import os
 
 load_dotenv()
 
 shortener = Shortener(api_key=os.getenv('BITLY_API_KEY'))
 
-def shorten(link:str) -> str:
+
+def shorten(link: str) -> str:
     shortened_link = ""
     if link.startswith('https://tinyurl.com/') or link.startswith('https://bit.ly/'):
         return link
@@ -17,18 +19,30 @@ def shorten(link:str) -> str:
             # shorten with bit.ly if tinyurl does not work
             shortened_link = shortener.bitly.short(link)
         except exceptions.BadAPIResponseException as err:
-            raise Exception('This link cannot be shortened: '+str(err)) from err
+            raise Exception(
+                'This link cannot be shortened: '+str(err)) from err
         except exceptions.ShorteningErrorException as err:
-            raise Exception('This link cannot be shortened: '+str(err)) from err
+            raise Exception(
+                'This link cannot be shortened: '+str(err)) from err
         else:
             return shortened_link
-        
     except exceptions.BadAPIResponseException as err:
         raise Exception('This link cannot be shortened: '+str(err)) from err
     except exceptions.BadURLException as err:
         raise Exception('This link cannot be shortened: '+str(err)) from err
+    except Exception as err:
+        try:
+            # shorten with bit.ly if tinyurl does not work
+            shortened_link = shortener.bitly.short(link)
+        except exceptions.BadAPIResponseException as err:
+            raise Exception(
+                'This link cannot be shortened: '+str(err)) from err
+        except exceptions.ShorteningErrorException as err:
+            raise Exception(
+                'This link cannot be shortened: '+str(err)) from err
+        else:
+            return shortened_link
     else:
         return shortened_link
+
     
-
-
