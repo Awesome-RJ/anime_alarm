@@ -8,3 +8,4 @@ migrate copy.json
 migrate_one.json
 migrate_two.json
 test.txt
+.idea/
