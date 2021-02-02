@@ -1,17 +1,14 @@
 import os
-from app_config import config, client, updater, users, anime_by_title, animes, all_users_by_anime, scraper, log_error, \
+from app_config import config, client, updater, users, animes, all_users_by_anime, scraper, log_error, \
     sort_anime_by_followers, logger, anime_by_id
-from scraping import GGAScraper, KAScraper, CannotDownloadAnimeException
+from scraping import CannotDownloadAnimeException
 from faunadb import query as q, errors
-from faunadb.objects import Ref, FaunaTime
-from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackQueryHandler, Filters, CallbackContext, Job, \
+from telegram.ext import CommandHandler, MessageHandler, CallbackQueryHandler, Filters, CallbackContext, Job, \
     JobQueue
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from dotenv import load_dotenv
 from telegram.error import TelegramError, Unauthorized, BadRequest, TimedOut, ChatMigrated, NetworkError
 from multiprocessing import Pool
-from threading import Thread
-from typing import Union
 from my_workaround import send_broadcast
 from shorten_link import shorten
 import datetime
@@ -44,10 +41,10 @@ def get_subscribed_users_for_anime(anime_doc_id):
     return subscribed_users
 
 
-def send_update_to_subscribed_users(anime, download_link=None, anime_info=None):
-    if type(anime) == type({'dict': '0'}):
+def send_update_to_subscribed_users(anime: dict, download_link=None, anime_info=None):
+    if isinstance(anime, dict):
         pass
-    elif type(anime) == type('str') or type(anime) == type(0):
+    elif isinstance(anime, str) or isinstance(anime, int):
         anime = client.query(
             q.get(q.ref(q.collection(animes), str(anime)))
         )
@@ -58,7 +55,7 @@ def send_update_to_subscribed_users(anime, download_link=None, anime_info=None):
     if anime_info['number_of_episodes'] > anime['data']['episodes']:
         if anime_info['latest_episode_link'] != anime['data']['last_episode']['link']:
             try:
-                if download_link == None:
+                if download_link is None:
                     download_link = shorten(scraper.get_download_link(anime_info['latest_episode_link']))
                 else:
                     pass
@@ -71,32 +68,36 @@ def send_update_to_subscribed_users(anime, download_link=None, anime_info=None):
                     updater.bot.send_message(chat_id=int(user['ref'].id()), text=text)
                 # send message to admin
                 updater.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text=anime['data'][
-                                                                                      'title'] + ' just got a new episode but could not be downloaded')
+                                                                                      'title'] + 'just got a new '
+                                                                                                 'episode but could '
+                                                                                                 'not be downloaded')
             else:
                 subscribed_users = get_subscribed_users_for_anime(anime['ref'].id())
 
                 markup = [[InlineKeyboardButton(text='Download', url=download_link)]]
                 # send message to subscribed users
-                try:
-                    for user in subscribed_users:
+
+                for user in subscribed_users:
+                    try:
                         text = "Here's the latest episode for {0}:\n\n{1}".format(anime['data']['title'],
                                                                                   anime_info['latest_episode_title'])
                         updater.bot.send_message(chat_id=int(user['ref'].id()), text=text,
                                                  reply_markup=InlineKeyboardMarkup(markup))
-                    # send message to admin
-                    updater.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'),
-                                             text=anime['data']['title'] + ' just got a new episode and was updated!')
-                    logger.write(
-                        str(len(subscribed_users)) + " users were notified of an update to " + anime['data']['title'])
-                except Unauthorized as err:
-                    # user has blocked bot
-                    # delete user from list
-                    client.query(
-                        q.delete(
-                            user['ref'],
+                    except Unauthorized as err:
+                        # user has blocked bot
+                        # delete user from list
+                        client.query(
+                            q.delete(
+                                user['ref'],
+                            )
                         )
-                    )
-                    logger.write("A user has been deleted from user list")
+                        logger.write("A user has been deleted from user list")
+                # send message to admin
+                updater.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'),
+                                         text=anime['data']['title'] + ' just got a new episode and was updated!')
+                logger.write(
+                    str(len(subscribed_users)) + " users were notified of an update to " + anime['data']['title'])
+
             finally:
                 # update anime in db after sending messages to users
                 client.query(
@@ -153,7 +154,9 @@ def plain_message(update: Update, context: CallbackContext):
         bot_user = client.query(q.get(q.ref(q.collection('users'), update.effective_chat.id)))
     except errors.NotFound:
         context.bot.send_message(chat_id=update.effective_chat.id,
-                                 text='Sorry, I do not understand what you mean.\nPlease use the /help command to discover what I can help you with.')
+                                 text='Sorry, I do not understand what you mean.\nPlease use the /help command to '
+                                      'discover what I can help you with.')
+        return
     user = User(update.effective_chat.id)
     last_command = bot_user['data']['last_command']
     message = update.message.text
@@ -218,7 +221,8 @@ def plain_message(update: Update, context: CallbackContext):
             context.bot.send_message(chat_id=user.chat_id, text="Only admins can use this command!")
     else:
         context.bot.send_message(chat_id=user.chat_id,
-                                 text="Sorry, I do not understand what you mean.\nPlease use the /help command to discover what I can help you with.")
+                                 text="Sorry, I do not understand what you mean.\nPlease use the /help command to "
+                                      "discover what I can help you with.")
 
 
 def callback_handler_func(update: Update, context: CallbackContext):
@@ -243,13 +247,15 @@ def callback_handler_func(update: Update, context: CallbackContext):
                                      reply_markup=InlineKeyboardMarkup(markup))
         except CannotDownloadAnimeException as err:
             log_error(err, log_to_admin_telegram=False)
-            context.bot.send_message(chat_id=user.chat_id, text="Sorry," + anime_info[
-                'latest_episode_title'] + " could not be downloaded at this time!")
-            context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text='A user tried to download ' + anime_info[
-                'latest_episode_title'] + " but could not due to error: " + str(err))
+            context.bot.send_message(chat_id=user.chat_id, text="Sorry," + payload + "could not be downloaded at this "
+                                                                                     "time!")
+            context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text='A user tried to download ' + payload +
+                                                                              "but could not due to error: " + str(err))
+            return
         except Exception as err:
             log_error(err)
-        finally:
+            return
+        else:
             # check if anime is in our anime registry
             try:
                 anime_from_db = client.query(
@@ -270,7 +276,7 @@ def callback_handler_func(update: Update, context: CallbackContext):
                 )
             except errors.NotFound:
                 anime_from_db = None
-            if anime_from_db != None:
+            if anime_from_db is not None:
                 send_update_to_subscribed_users(anime_from_db, download_link=latest_episode_download_link,
                                                 anime_info=anime_info)
     else:
@@ -340,7 +346,7 @@ def unsubscribe(update: Update, context: CallbackContext):
         # update last command
         user.update_last_command('')
 
-        if animes_watched == []:
+        if not animes_watched:
             context.bot.send_message(chat_id=user.chat_id, text='You are currently not subscribed to any anime')
     except Exception as err:
         log_error(err)
@@ -378,9 +384,8 @@ def get_latest(update: Update, context: CallbackContext):
         log_error(err)
 
 
-def help(update, context):
+def help_user(update, context):
     user = User(update.effective_chat.id)
-    message = ''
     if str(user.chat_id) == str(os.getenv('ADMIN_CHAT_ID')):
         message = config['message']['help_admin']
     else:
@@ -471,7 +476,6 @@ def recommend(update: Update, context: CallbackContext):
     context.bot.send_message(chat_id=chat_id, text='Here are the top animes people using Anime Alarm are watching')
 
     for anime in results['data']:
-        link = ''
         if anime['data']['link'].startswith('https://tinyurl.com/') or anime['data']['link'].startswith(
                 'https://bit.ly/'):
             link = anime['data']['link']
@@ -523,7 +527,7 @@ def broadcast(update: Update, context: CallbackContext):
 
 watch_handler = CommandHandler('subscribe', subscribe)
 unwatch_handler = CommandHandler('unsubscribe', unsubscribe)
-help_handler = CommandHandler(['help', 'start'], help)
+help_handler = CommandHandler(['help', 'start'], help_user)
 donate_handler = CommandHandler('donate', donate)
 message_handler = MessageHandler(Filters.text & (~Filters.command), plain_message)
 callback_handler = CallbackQueryHandler(callback_handler_func)

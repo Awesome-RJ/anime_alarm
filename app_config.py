@@ -39,13 +39,12 @@ scraper = GGAScraper()
 # setting up custom logger
 logger = Logger(config['app_log_path'])
 
-def log_error(error: Exception, log_to_admin_telegram=True):
-    error_message = 'An error occurred: '+str(error)
+
+def log_error(error: Exception, log_to_admin_telegram=True) -> None:
+    error_message = 'An error occurred: ' + str(error)
     capture_exception(error)
     logger.write(error_message)
     if log_to_admin_telegram:
         updater.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text=error_message)
     else:
         pass
-
-
