@@ -126,7 +126,8 @@ def run_cron():
 
     def check_for_update(context: CallbackContext):
         print('about to run subscription check')
-        updater.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text='About to run subscription check!')
+        # updater.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text='About to run subscription check!')
+        logger.write("About to run subscription check")
         # get all anime
         all_animes = client.query(
             q.paginate(q.documents(q.collection(animes)))
@@ -137,7 +138,8 @@ def run_cron():
             # if there are new episodes...
             send_update_to_subscribed_users(anime.id())
 
-        context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text='Subscription check finished!')
+        # context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text='Subscription check finished!')
+        logger.write("Subscription check finished")
 
     try:
         # run job every 4 hours
@@ -246,7 +248,7 @@ def callback_handler_func(update: Update, context: CallbackContext):
             context.bot.send_message(chat_id=user.chat_id, text=anime_info['latest_episode_title'],
                                      reply_markup=InlineKeyboardMarkup(markup))
         except CannotDownloadAnimeException as err:
-            log_error(err, log_to_admin_telegram=False)
+            log_error(err)
             context.bot.send_message(chat_id=user.chat_id, text="Sorry," + payload + "could not be downloaded at this "
                                                                                      "time!")
             context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text='A user tried to download ' + payload +
@@ -525,6 +527,14 @@ def broadcast(update: Update, context: CallbackContext):
         context.bot.send_message(chat_id=user.chat_id, text='Only admins can use this command!')
 
 
+def app_log(update: Update, context: CallbackContext):
+    user = User(update.effective_chat.id)
+    if user.is_admin():
+        context.bot.send_message(chat_id=user.chat_id, text=''.join(logger.read()))
+    else:
+        context.bot.send_message(chat_id=user.chat_id, text='Only admins can use this command!')
+
+
 watch_handler = CommandHandler('subscribe', subscribe)
 unwatch_handler = CommandHandler('unsubscribe', unsubscribe)
 help_handler = CommandHandler(['help', 'start'], help_user)
@@ -536,6 +546,7 @@ recommend_handler = CommandHandler('recommend', recommend)
 users_handler = CommandHandler('usercount', number_of_users)
 anime_handler = CommandHandler('animecount', number_of_anime)
 broadcast_handler = CommandHandler('broadcast', broadcast)
+app_log_handler = CommandHandler('log', app_log)
 
 dispatcher.add_handler(watch_handler)
 dispatcher.add_handler(unwatch_handler)
@@ -548,6 +559,7 @@ dispatcher.add_handler(recommend_handler)
 dispatcher.add_handler(users_handler)
 dispatcher.add_handler(anime_handler)
 dispatcher.add_handler(broadcast_handler)
+dispatcher.add_handler(app_log_handler)
 
 dispatcher.add_error_handler(error_handler)
 

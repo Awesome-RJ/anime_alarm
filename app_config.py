@@ -10,8 +10,20 @@ load_dotenv()
 
 config = {
     "message": {
-        "help": "Hi, I'm Anime Alarm!\nI'm capable of bringing the latest anime episodes straight to your DMs for download and many more.\nHere's how to take advantage of my greatness:\n\n/subscribe - subscribe to any anime and get updates for new episodes\n/unsubscribe - stop receiving updates for an anime\n/latest - download the last episode of any anime instantly\n/help - get help and learn about Anime Alarm\n/donate - donate to help this project\n/recommend - get anime recommendations based on what other people using Anime Alarm are watching",
-        "help_admin": "Hi, I'm Anime Alarm!\nI'm capable of bringing the latest anime episodes straight to your DMs for download and many more.\nHere's how to take advantage of my greatness:\n\n/subscribe - subscribe to any anime and get updates for new episodes\n/unsubscribe - stop receiving updates for an anime\n/latest - download the last episode of any anime instantly\n/help - get help and learn about Anime Alarm\n/donate - donate to help this project\n/recommend - get anime recommendations based on what other people using Anime Alarm are watching\n/usercount - get number of users\n/animecount - get number of anime\n/broadcast - broadcast messages to all users",
+        "help": "Hi, I'm Anime Alarm!\nI'm capable of bringing the latest anime episodes straight to your DMs for "
+                "download and many more.\nHere's how to take advantage of my greatness:\n\n/subscribe - subscribe to "
+                "any anime and get updates for new episodes\n/unsubscribe - stop receiving updates for an "
+                "anime\n/latest - download the last episode of any anime instantly\n/help - get help and learn about "
+                "Anime Alarm\n/donate - donate to help this project\n/recommend - get anime recommendations based on "
+                "what other people using Anime Alarm are watching",
+        "help_admin": "Hi, I'm Anime Alarm!\nI'm capable of bringing the latest anime episodes straight to your DMs "
+                      "for download and many more.\nHere's how to take advantage of my greatness:\n\n/subscribe - "
+                      "subscribe to any anime and get updates for new episodes\n/unsubscribe - stop receiving updates "
+                      "for an anime\n/latest - download the last episode of any anime instantly\n/help - get help and "
+                      "learn about Anime Alarm\n/donate - donate to help this project\n/recommend - get anime "
+                      "recommendations based on what other people using Anime Alarm are watching\n/usercount - get "
+                      "number of users\n/animecount - get number of anime\n/broadcast - broadcast messages to all "
+                      "users\n/log - read app logs",
         "donate": [
             "You can donate in Bitcoin and Ethereum to help the development of this project.",
             "Bitcoin address:",
@@ -40,11 +52,11 @@ scraper = GGAScraper()
 logger = Logger(config['app_log_path'])
 
 
-def log_error(error: Exception, log_to_admin_telegram=True) -> None:
+def log_error(error: Exception, log_to_admin_telegram=False) -> None:
     error_message = 'An error occurred: ' + str(error)
     capture_exception(error)
     logger.write(error_message)
-    if log_to_admin_telegram:
+    if log_to_admin_telegram is True:
         updater.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text=error_message)
     else:
         pass
