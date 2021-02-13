@@ -204,7 +204,6 @@ def plain_message(update: Update, context: CallbackContext):
 
     elif last_command == 'broadcast':
         if user.is_admin():
-            print('is_admin')
             context.bot.send_message(chat_id=user.chat_id, text='Broadcasting message...')
             try:
                 results = client.query(
@@ -213,7 +212,7 @@ def plain_message(update: Update, context: CallbackContext):
                 results = results['data']
 
                 # spin 5 processes
-                with Pool(5) as p:
+                with Pool(4) as p:
                     p.map(send_broadcast, [[int(user_ref.id()), message] for user_ref in results])
                 # update user last command
                 user.update_last_command('')
@@ -530,7 +529,7 @@ def broadcast(update: Update, context: CallbackContext):
 def app_log(update: Update, context: CallbackContext):
     user = User(update.effective_chat.id)
     if user.is_admin():
-        context.bot.send_message(chat_id=user.chat_id, text=''.join(logger.read()))
+        context.bot.send_message(chat_id=user.chat_id, text=''.join(logger.read()[-5:]))
     else:
         context.bot.send_message(chat_id=user.chat_id, text='Only admins can use this command!')
 
