@@ -1,5 +1,9 @@
+"""
+This module is where the scraping part of Anime Alarm is done
+"""
+
 import requests
-from custom_exceptions import CannotDownloadAnimeException, CannotGetAnimeInfoException
+from anime_alarm.custom_exceptions import CannotDownloadAnimeException, CannotGetAnimeInfoException
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 import os
@@ -7,14 +11,17 @@ from shorten_link import shorten
 
 load_dotenv()
 
+site_home_link = 'https://gogoanime.so'
+
 
 class GGAScraper:
     def __init__(self):
-        self.site_home_link = 'https://gogoanime.so'
+        pass
 
-    def get_anime(self, anime: str, limit=10) -> list:
-        URL = "https://gogoanime.so//search.html?keyword=" + anime
-        page = requests.get(URL)
+    @staticmethod
+    def get_anime(anime: str, limit=10) -> list:
+        url = "https://gogoanime.so//search.html?keyword=" + anime
+        page = requests.get(url)
 
         soup = BeautifulSoup(page.content, 'html.parser')
 
@@ -38,7 +45,8 @@ class GGAScraper:
 
         return result_list
 
-    def get_anime_info(self, animelink):
+    @staticmethod
+    def get_anime_info(animelink):
         page = requests.get(animelink)
         soup = BeautifulSoup(page.content, 'html.parser')
 
@@ -68,7 +76,7 @@ class GGAScraper:
                 }
             else:
                 latest_episode_elem = episodes_elem.find_all('li', limit=1)[0]
-                link = self.site_home_link + (latest_episode_elem.find('a')['href']).strip()
+                link = site_home_link + (latest_episode_elem.find('a')['href']).strip()
         except Exception as err:
             raise CannotGetAnimeInfoException(animelink, err)
         return {
@@ -80,7 +88,8 @@ class GGAScraper:
             'latest_episode_link': link,
         }
 
-    def get_download_link(self, anime_download_page_link):
+    @staticmethod
+    def get_download_link(anime_download_page_link):
         try:
             download_page_soup = BeautifulSoup(requests.get(anime_download_page_link).content, 'html.parser')
             download_options_soup = BeautifulSoup(

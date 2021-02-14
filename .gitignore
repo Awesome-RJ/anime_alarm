@@ -2,10 +2,5 @@ __pycache__/
 .env
 app.log
 .vscode/
-migrate.json
-script.py 
-migrate copy.json
-migrate_one.json
-migrate_two.json
-test.txt
+dev/
 .idea/

@@ -1,20 +1,17 @@
-import os
-from telegram.ext import Updater
+"""
+This module is simple a workaround a 'bug' in the multiprocessing package
+"""
+
 from dotenv import load_dotenv
 from telegram.error import Unauthorized
 from faunadb import query as q, errors
-from app_config import client, users, logger
-
-load_dotenv()
-
-# setting up telegram stuff
-updater = Updater(token=os.getenv('TELEGRAM_TOKEN'))
+from app_config import client, users, logger, log_error, updater
 
 
 def send_broadcast(args):
+    print(args)
     try:
         updater.bot.send_message(chat_id=args[0], text=args[1])
-        return 'success'
     except Unauthorized:
         # user blocked bot so delete user from list
         user = client.query(
@@ -25,5 +22,10 @@ def send_broadcast(args):
                 user['ref'],
             )
         )
-        logger.write("a user has been deleted from user list")
+        logger.info("a user has been deleted from user list")
         return ''
+    except Exception as err:
+        log_error(err)
+        return ''
+    else:
+        return 'success'

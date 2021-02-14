@@ -1,3 +1,7 @@
+"""
+This module contains the functions for shortening links
+"""
+
 from pyshorteners import Shortener, exceptions
 from dotenv import load_dotenv
 from requests import ReadTimeout
@@ -44,5 +48,3 @@ def shorten(link: str) -> str:
             return shortened_link
     else:
         return shortened_link
-
-    

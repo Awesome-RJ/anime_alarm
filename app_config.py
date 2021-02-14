@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 from telegram.ext import Updater
 from faunadb.client import FaunaClient
-from scraping import GGAScraper
+from anime_alarm.scraping import GGAScraper
 import logging
 from sentry_sdk import capture_exception
 import os
@@ -50,24 +50,28 @@ anime_by_id = 'all_anime_by_anime_id'
 scraper = GGAScraper()
 
 # setting up custom logger
+
 log_file_path = 'app.log'
-logger = logging.getLogger('anime_alarm_logger')
+
 f_handler = logging.FileHandler(log_file_path, mode='a+')
-f_handler.setLevel(logging.DEBUG)
-
-
 f_format = logging.Formatter(
-    '%(asctime)s (%(levelname)s)  - %(message)s',
+    '[%(asctime)s] (%(levelname)s)  - %(message)s',
     datefmt='%d-%B-%Y %H:%M:%S'
 )
+f_handler.setFormatter(f_format)
+logger = logging.getLogger('anime_alarm_logger')
+logger.addHandler(f_handler)
+logger.setLevel(logging.DEBUG)
 
 
 def log_error(error: Exception, log_to_admin_telegram=False) -> None:
     error_message = 'An error occurred: ' + str(error)
     capture_exception(error)
     logger.error(
-        msg=error_message
+        msg=error_message,
+        exc_info=True
     )
+
     if log_to_admin_telegram is True:
         updater.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text=error_message)
     else:

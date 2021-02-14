@@ -1,4 +1,5 @@
 import os
+from pprint import pprint
 from app_config import config, client, updater, users, animes, all_users_by_anime, scraper, log_error, \
     sort_anime_by_followers, anime_by_id, logger, log_file_path
 from scraping import CannotDownloadAnimeException
@@ -13,6 +14,7 @@ from my_workaround import send_broadcast
 from shorten_link import shorten
 import datetime
 from models import User
+from decorators import admin_only, mark_inactive
 import sentry_sdk
 
 # set up sentry
@@ -28,13 +30,16 @@ load_dotenv()
 dispatcher = updater.dispatcher
 job_queue = updater.job_queue
 
+maintenance_message = 'Bot is currently undergoing maintenance and upgrades'
+
 
 def get_subscribed_users_for_anime(anime_doc_id):
     subscribed_users = []
     subscribed_users = client.query(
         q.map_(
             q.lambda_('doc_ref', q.get(q.var('doc_ref'))),
-            q.paginate(q.match(q.index(all_users_by_anime), q.ref(q.collection(animes), str(anime_doc_id))))
+            q.paginate(q.match(q.index(all_users_by_anime), q.ref(q.collection(animes), str(anime_doc_id))),
+                       size=100000)
         )
     )
     subscribed_users = subscribed_users['data']
@@ -130,7 +135,7 @@ def run_cron():
         logger.info("About to run subscription check")
         # get all anime
         all_animes = client.query(
-            q.paginate(q.documents(q.collection(animes)))
+            q.paginate(q.documents(q.collection(animes)), size=100000)
         )
 
         for anime in all_animes['data']:
@@ -150,6 +155,7 @@ def run_cron():
         log_error(err)
 
 
+@mark_inactive(message=maintenance_message)
 def plain_message(update: Update, context: CallbackContext):
     print(update.effective_message)
     try:
@@ -207,18 +213,21 @@ def plain_message(update: Update, context: CallbackContext):
             context.bot.send_message(chat_id=user.chat_id, text='Broadcasting message...')
             try:
                 results = client.query(
-                    q.paginate(q.documents(q.collection(users)))
+                    q.paginate(q.documents(q.collection(users)), size=100000)
                 )
                 results = results['data']
+                pprint(results)
+                pprint(len(results))
 
                 # spin 5 processes
-                with Pool(4) as p:
+                with Pool(5) as p:
                     res = p.map(send_broadcast, [[int(user_ref.id()), message] for user_ref in results])
                     successful_broadcast = []
                     for i in res:
                         if i == 'success':
                             successful_broadcast.append(i)
                     logger.info('Message broadcast to ' + str(len(successful_broadcast)) + ' users')
+                    print(res)
                 # update user last command
                 user.update_last_command('')
             except Exception as err:
@@ -231,6 +240,7 @@ def plain_message(update: Update, context: CallbackContext):
                                       "discover what I can help you with.")
 
 
+@mark_inactive(message=maintenance_message)
 def callback_handler_func(update: Update, context: CallbackContext):
     user = User(update.effective_chat.id)
     callback_message = update.callback_query.message.reply_markup.inline_keyboard[0][0].callback_data
@@ -289,6 +299,7 @@ def callback_handler_func(update: Update, context: CallbackContext):
         pass
 
 
+@mark_inactive(message=maintenance_message)
 def subscribe(update, context):
     chat_id = update.effective_chat.id
 
@@ -323,6 +334,7 @@ def subscribe(update, context):
         log_error(err)
 
 
+@mark_inactive(message=maintenance_message)
 def unsubscribe(update: Update, context: CallbackContext):
     user = User(update.effective_chat.id)
     # TODO: TEST THE UNSUBSCRIBE COMMAND WHEN THE USER IS NOT FOLLWOWING ANY ANIME
@@ -358,6 +370,7 @@ def unsubscribe(update: Update, context: CallbackContext):
         log_error(err)
 
 
+@mark_inactive(message=maintenance_message)
 def get_latest(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
 
@@ -390,6 +403,7 @@ def get_latest(update: Update, context: CallbackContext):
         log_error(err)
 
 
+@mark_inactive(message=maintenance_message)
 def help_user(update, context):
     user = User(update.effective_chat.id)
     if str(user.chat_id) == str(os.getenv('ADMIN_CHAT_ID')):
@@ -421,6 +435,7 @@ def help_user(update, context):
         log_error(err)
 
 
+@mark_inactive(message=maintenance_message)
 def donate(update, context):
     try:
         for message in config['message']['donate']:
@@ -448,6 +463,7 @@ def donate(update, context):
         log_error(err)
 
 
+@mark_inactive(message=maintenance_message)
 def error_handler(update: Update, context: CallbackContext):
     try:
         raise context.error
@@ -470,6 +486,7 @@ def error_handler(update: Update, context: CallbackContext):
         log_error(err)
 
 
+@mark_inactive(message=maintenance_message)
 def recommend(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
     results = client.query(
@@ -492,55 +509,57 @@ def recommend(update: Update, context: CallbackContext):
                                  text=str(results['data'].index(anime) + 1) + '. ' + anime['data']['title'])
 
 
+@mark_inactive(message=maintenance_message)
+@admin_only
 def number_of_users(update: Update, context: CallbackContext):
     user = User(update.effective_chat.id)
-    if user.is_admin():
-        result = client.query(
-            q.count(
-                q.paginate(
-                    q.documents(
-                        q.collection(users)
-                    )
-                )
-            )
+    result = client.query(
+        q.count(
+            q.paginate(
+                q.documents(
+                    q.collection(users)
+                ),
+                size=100000
+
+            ),
+
         )
-        context.bot.send_message(chat_id=user.chat_id, text='Number of users: ' + str(result['data'][0]))
+    )
+    context.bot.send_message(chat_id=user.chat_id, text='Number of users: ' + str(result['data'][0]))
 
 
+@mark_inactive(message=maintenance_message)
+@admin_only
 def number_of_anime(update: Update, context: CallbackContext):
-    user = User(update.effective_chat.id)
-    if user.is_admin():
-        result = client.query(
-            q.count(
-                q.paginate(
-                    q.documents(
-                        q.collection(animes)
-                    )
-                )
+    result = client.query(
+        q.count(
+            q.paginate(
+                q.documents(
+                    q.collection(animes)
+                ),
+                size=100000
             )
         )
-        context.bot.send_message(chat_id=user.chat_id, text='Number of anime: ' + str(result['data'][0]))
+    )
+    context.bot.send_message(chat_id=update.effective_chat.id, text='Number of anime: ' + str(result['data'][0]))
 
 
+@mark_inactive(message=maintenance_message)
+@admin_only
 def broadcast(update: Update, context: CallbackContext):
     user = User(update.effective_chat.id)
-    if user.is_admin():
-        context.bot.send_message(chat_id=user.chat_id, text='Enter the message you want to broadcast')
-        user.update_last_command('broadcast')
-    else:
-        context.bot.send_message(chat_id=user.chat_id, text='Only admins can use this command!')
+    context.bot.send_message(chat_id=user.chat_id, text='Enter the message you want to broadcast')
+    user.update_last_command('broadcast')
 
 
+@mark_inactive(message=maintenance_message)
+@admin_only
 def app_log(update: Update, context: CallbackContext):
     user = User(update.effective_chat.id)
     logs = []
     with open(log_file_path, 'r') as f:
         logs = f.readlines()
-
-    if user.is_admin():
         context.bot.send_message(chat_id=user.chat_id, text=''.join(logs[-5:]))
-    else:
-        context.bot.send_message(chat_id=user.chat_id, text='Only admins can use this command!')
 
 
 watch_handler = CommandHandler('subscribe', subscribe, run_async=True)

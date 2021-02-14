@@ -1,6 +1,11 @@
+"""
+This module contains models for different entities in Anime Alarm
+"""
+
 from app_config import updater, scraper, client, users, animes, anime_by_id, log_error, logger
 from faunadb import query as q, errors
-from custom_exceptions import UserNotFoundException
+from anime_alarm.custom_exceptions import UserNotFoundException
+
 
 class User:
     def __init__(self, chat_id):
@@ -15,10 +20,9 @@ class User:
             raise UserNotFoundException(self.chat_id)
         return result
 
-    
-    def subscribe_to_anime(self, anime_link:str):
+    def subscribe_to_anime(self, anime_link: str):
         try:
-            #create a new anime document
+            # create a new anime document
             anime_info = scraper.get_anime_info(anime_link)
             anime = client.query(
                 q.create(
@@ -31,7 +35,7 @@ class User:
                             'anime_id': anime_info['anime_id'],
                             'anime_alias': anime_info['anime_alias'],
                             'episodes': anime_info['number_of_episodes'],
-                            'last_episode':{
+                            'last_episode': {
                                 'link': anime_info['latest_episode_link'],
                                 'title': anime_info['latest_episode_title'],
                             },
@@ -42,12 +46,12 @@ class User:
 
         except errors.BadRequest as err:
             if str(err) == "document is not unique.":
-                anime = client.query(  
+                anime = client.query(
                     q.get(q.match(q.index(anime_by_id), anime_info['anime_id']))
                 )
-                print(anime) 
+                print(anime)
 
-        #update user's watch list
+                # update user's watch list
         try:
             result = client.query(
                 q.let(
@@ -55,7 +59,7 @@ class User:
                         'user_anime_list': q.select(
                             ['data', 'animes_watching'],
                             q.get(q.ref(q.collection(users), self.chat_id))
-                        ) 
+                        )
                     },
 
                     q.if_(
@@ -82,7 +86,7 @@ class User:
                                 }
                             )
                         )
-                        
+
                     )
 
                 )
@@ -91,12 +95,12 @@ class User:
             if type(result) is str:
                 updater.bot.send_message(chat_id=self.chat_id, text=result)
             else:
-                updater.bot.send_message(chat_id=self.chat_id, text='You are now listening for updates on '+anime['data']['title'])
+                updater.bot.send_message(chat_id=self.chat_id,
+                                         text='You are now listening for updates on ' + anime['data']['title'])
         except Exception as err:
             log_error(err)
 
-
-    def unsubscribe_from_anime(self, anime_doc_id:str):
+    def unsubscribe_from_anime(self, anime_doc_id: str):
         try:
             anime = client.query(
                 q.get(q.ref(q.collection(animes), anime_doc_id))
@@ -107,13 +111,13 @@ class User:
                         'anime_ref': q.ref(q.collection(animes), anime_doc_id),
                         'bot_user': q.ref(q.collection(users), self.chat_id),
                         'followers': q.select(['data', 'followers'], q.get(q.var('anime_ref'))),
-                        
+
                     },
                     q.do(
                         q.update(
                             q.var('anime_ref'),
                             {
-                                'data':{
+                                'data': {
                                     'followers': q.subtract(
                                         q.var('followers'),
                                         1
@@ -126,7 +130,8 @@ class User:
                             {
                                 'data': {
                                     'animes_watching': q.filter_(
-                                        q.lambda_('watched_anime_ref', q.not_(q.equals(q.var('watched_anime_ref'), q.var('anime_ref')))),
+                                        q.lambda_('watched_anime_ref',
+                                                  q.not_(q.equals(q.var('watched_anime_ref'), q.var('anime_ref')))),
                                         q.select(['data', 'animes_watching'], q.get(q.var('bot_user')))
                                     )
                                 }
@@ -141,14 +146,13 @@ class User:
                 )
             )
 
-            updater.bot.send_message(chat_id=self.chat_id, text='You have stopped following '+anime['data']['title'])
+            updater.bot.send_message(chat_id=self.chat_id, text='You have stopped following ' + anime['data']['title'])
         except errors.NotFound:
-            logger.write('Somehow, a user {0} almost unsubscribed from an anime that did not exist'.format(self.chat_id))
+            logger.info('Somehow, a user {0} almost unsubscribed from an anime that did not exist'.format(self.chat_id))
         except Exception as err:
             log_error(err)
 
-
-    def update_last_command(self, new_last_command:str):
+    def update_last_command(self, new_last_command: str):
         client.query(
             q.update(
                 q.ref(q.collection(users), self.chat_id),
@@ -158,7 +162,4 @@ class User:
                     }
                 }
             )
-        )    
-
-
-
+        )
