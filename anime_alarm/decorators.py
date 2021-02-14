@@ -39,16 +39,12 @@ def mark_inactive(message='This command has been disabled temporarily'):
     def decorator_mark_inactive(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            if 'message' in kwargs:
-                msg = kwargs['message']
-            else:
-                msg = message
             for arg in args:
                 if isinstance(arg, Update):
                     user = User(arg.effective_chat.id)
                     for arg2 in args:
                         if isinstance(arg2, CallbackContext):
-                            arg2.bot.send_message(chat_id=user.chat_id, text=msg)
+                            arg2.bot.send_message(chat_id=user.chat_id, text=message)
                             break
                         else:
                             continue

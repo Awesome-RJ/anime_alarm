@@ -592,11 +592,11 @@ dispatcher.add_error_handler(error_handler)
 
 if __name__ == '__main__':
     print('started')
-    #updater.start_polling()
     updater.start_webhook(
-        listen='0.0.0.1',
-        port=8443,
+        listen='0.0.0.0',
+        port=80,
         url_path=os.getenv('TELEGRAM_TOKEN'),
-        webhook_url='https://acb599a054d2.ngrok.io/'+os.getenv('TELEGRAM_TOKEN')
+        webhook_url=os.getenv('TELEGRAM_BOT_URL')+os.getenv('TELEGRAM_TOKEN')
     )
+    updater.bot.setWebhook(os.getenv('TELEGRAM_BOT_URL')+os.getenv('TELEGRAM_TOKEN'))
     run_cron()
