@@ -14,7 +14,7 @@ updater = Updater(token=os.getenv('TELEGRAM_TOKEN'))
 def send_broadcast(args):
     try:
         updater.bot.send_message(chat_id=args[0], text=args[1])
-
+        return 'success'
     except Unauthorized:
         # user blocked bot so delete user from list
         user = client.query(
@@ -26,3 +26,4 @@ def send_broadcast(args):
             )
         )
         logger.write("a user has been deleted from user list")
+        return ''

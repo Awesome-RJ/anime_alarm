@@ -2,6 +2,10 @@ from datetime import datetime
 
 
 class Logger:
+    """
+    Logger is a custom logging class for logging events and errors.
+    Note that it is now deprecated and the builtin logging module should be used instead
+    """
 
     def __init__(self, log_file_path):
         self.file_path = log_file_path

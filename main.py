@@ -1,6 +1,6 @@
 import os
 from app_config import config, client, updater, users, animes, all_users_by_anime, scraper, log_error, \
-    sort_anime_by_followers, logger, anime_by_id
+    sort_anime_by_followers, anime_by_id, logger, log_file_path
 from scraping import CannotDownloadAnimeException
 from faunadb import query as q, errors
 from telegram.ext import CommandHandler, MessageHandler, CallbackQueryHandler, Filters, CallbackContext, Job, \
@@ -91,11 +91,11 @@ def send_update_to_subscribed_users(anime: dict, download_link=None, anime_info=
                                 user['ref'],
                             )
                         )
-                        logger.write("A user has been deleted from user list")
+                        logger.info("A user has been deleted from user list")
                 # send message to admin
                 updater.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'),
                                          text=anime['data']['title'] + ' just got a new episode and was updated!')
-                logger.write(
+                logger.info(
                     str(len(subscribed_users)) + " users were notified of an update to " + anime['data']['title'])
 
             finally:
@@ -127,7 +127,7 @@ def run_cron():
     def check_for_update(context: CallbackContext):
         print('about to run subscription check')
         # updater.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text='About to run subscription check!')
-        logger.write("About to run subscription check")
+        logger.info("About to run subscription check")
         # get all anime
         all_animes = client.query(
             q.paginate(q.documents(q.collection(animes)))
@@ -139,7 +139,7 @@ def run_cron():
             send_update_to_subscribed_users(anime.id())
 
         # context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text='Subscription check finished!')
-        logger.write("Subscription check finished")
+        logger.info("Subscription check finished")
 
     try:
         # run job every 4 hours
@@ -213,7 +213,12 @@ def plain_message(update: Update, context: CallbackContext):
 
                 # spin 5 processes
                 with Pool(4) as p:
-                    p.map(send_broadcast, [[int(user_ref.id()), message] for user_ref in results])
+                    res = p.map(send_broadcast, [[int(user_ref.id()), message] for user_ref in results])
+                    successful_broadcast = []
+                    for i in res:
+                        if i == 'success':
+                            successful_broadcast.append(i)
+                    logger.info('Message broadcast to ' + str(len(successful_broadcast)) + ' users')
                 # update user last command
                 user.update_last_command('')
             except Exception as err:
@@ -528,24 +533,28 @@ def broadcast(update: Update, context: CallbackContext):
 
 def app_log(update: Update, context: CallbackContext):
     user = User(update.effective_chat.id)
+    logs = []
+    with open(log_file_path, 'r') as f:
+        logs = f.readlines()
+
     if user.is_admin():
-        context.bot.send_message(chat_id=user.chat_id, text=''.join(logger.read()[-5:]))
+        context.bot.send_message(chat_id=user.chat_id, text=''.join(logs[-5:]))
     else:
         context.bot.send_message(chat_id=user.chat_id, text='Only admins can use this command!')
 
 
-watch_handler = CommandHandler('subscribe', subscribe)
-unwatch_handler = CommandHandler('unsubscribe', unsubscribe)
-help_handler = CommandHandler(['help', 'start'], help_user)
-donate_handler = CommandHandler('donate', donate)
-message_handler = MessageHandler(Filters.text & (~Filters.command), plain_message)
-callback_handler = CallbackQueryHandler(callback_handler_func)
-get_latest_handler = CommandHandler('latest', get_latest)
-recommend_handler = CommandHandler('recommend', recommend)
-users_handler = CommandHandler('usercount', number_of_users)
-anime_handler = CommandHandler('animecount', number_of_anime)
-broadcast_handler = CommandHandler('broadcast', broadcast)
-app_log_handler = CommandHandler('log', app_log)
+watch_handler = CommandHandler('subscribe', subscribe, run_async=True)
+unwatch_handler = CommandHandler('unsubscribe', unsubscribe, run_async=True)
+help_handler = CommandHandler(['help', 'start'], help_user, run_async=True)
+donate_handler = CommandHandler('donate', donate, run_async=True)
+message_handler = MessageHandler(Filters.text & (~Filters.command), plain_message, run_async=True)
+callback_handler = CallbackQueryHandler(callback_handler_func, run_async=True)
+get_latest_handler = CommandHandler('latest', get_latest, run_async=True)
+recommend_handler = CommandHandler('recommend', recommend, run_async=True)
+users_handler = CommandHandler('usercount', number_of_users, run_async=True)
+anime_handler = CommandHandler('animecount', number_of_anime, run_async=True)
+broadcast_handler = CommandHandler('broadcast', broadcast, run_async=True)
+app_log_handler = CommandHandler('log', app_log, run_async=True)
 
 dispatcher.add_handler(watch_handler)
 dispatcher.add_handler(unwatch_handler)
@@ -565,4 +574,12 @@ dispatcher.add_error_handler(error_handler)
 if __name__ == '__main__':
     print('started')
     updater.start_polling()
+    # updater.start_webhook(
+    #     listen='0.0.0.0',
+    #     port=8443,
+    #     url_path=os.getenv('TELEGRAM_TOKEN'),
+    #     key='',
+    #     cert='',
+    #     webhook_url='https://compute_engine_path:8443/'+os.getenv('TELEGRAM_TOKEN')
+    # )
     run_cron()
