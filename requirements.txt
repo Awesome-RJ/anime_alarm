@@ -4,5 +4,4 @@ python-telegram-bot==13.1
 faunadb==4.0.1
 python-dotenv==0.15.0
 pyshorteners==1.0.1
-Flask==1.1.2
 sentry-sdk==0.19.5

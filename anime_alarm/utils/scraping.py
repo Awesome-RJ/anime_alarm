@@ -3,15 +3,25 @@ This module is where the scraping part of Anime Alarm is done
 """
 
 import requests
-from anime_alarm.custom_exceptions import CannotDownloadAnimeException, CannotGetAnimeInfoException
+from anime_alarm.exceptions import CannotDownloadAnimeException, CannotGetAnimeInfoException
+from anime_alarm.enums import Resolution
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 import os
-from shorten_link import shorten
+from .shorten_link import shorten
+from typing import List, Dict
 
 load_dotenv()
 
 site_home_link = 'https://gogoanime.so'
+
+# a map of different resolutions to their values
+resolutions = {
+    Resolution.LOW: '360P',
+    Resolution.MEDIUM: '480P',
+    Resolution.HIGH: '720P',
+    Resolution.ULTRA: '1080P'
+}
 
 
 class GGAScraper:
@@ -19,7 +29,7 @@ class GGAScraper:
         pass
 
     @staticmethod
-    def get_anime(anime: str, limit=10) -> list:
+    def get_anime(anime: str, limit=10) -> List:
         url = "https://gogoanime.so//search.html?keyword=" + anime
         page = requests.get(url)
 
@@ -46,7 +56,7 @@ class GGAScraper:
         return result_list
 
     @staticmethod
-    def get_anime_info(animelink):
+    def get_anime_info(animelink) -> Dict:
         page = requests.get(animelink)
         soup = BeautifulSoup(page.content, 'html.parser')
 
@@ -89,15 +99,33 @@ class GGAScraper:
         }
 
     @staticmethod
-    def get_download_link(anime_download_page_link):
+    def get_download_link(episode_link, resolution: Resolution = Resolution.MEDIUM):
         try:
-            download_page_soup = BeautifulSoup(requests.get(anime_download_page_link).content, 'html.parser')
+            download_page_soup = BeautifulSoup(requests.get(episode_link).content, 'html.parser')
+            dowloads_div = download_page_soup.find('li', class_='dowloads')
             download_options_soup = BeautifulSoup(
-                requests.get(download_page_soup.find('li', class_='dowloads').find('a')['href']).content, 'html.parser')
+                requests.get(dowloads_div.find('a')['href']).content, 'html.parser'
+            )
+            download_link = ''
+            download_divs = download_options_soup.find_all('div', class_='dowload')
+            for div in download_divs:
+                # get download link for given resolution
+                if resolutions[resolution].lower() in div.text.strip().lower():
+                    download_link = shorten(div.find('a')['href'])
 
-            download_link = shorten(download_options_soup.find_all('div', class_="dowload")[0].find('a')['href'])
+            # if given resolution doesn't exist, check for medium. If medium doesn't exist, just get the first link
+            if download_link == '':
+                # required_div refers to a single-element list containing the div we want
+                required_div = [div for div in download_divs if
+                                resolutions[Resolution.MEDIUM].lower() in div.text.strip().lower()]
+                if len(required_div) == 0:
+                    # get first available link
+                    download_link = download_divs[0].find('a')['href']
+                else:
+                    # get link for medium resolution
+                    download_link = shorten(required_div[0].find('a')['href'])
         except Exception as err:
-            raise CannotDownloadAnimeException(anime_download_page_link, err)
+            raise CannotDownloadAnimeException(episode_link, err)
 
         return download_link
 
@@ -197,3 +225,12 @@ class KAScraper:
         page = requests.get(durl, headers=headers, allow_redirects=False)
         download_link = page.headers['Location']
         return download_link
+
+
+if __name__ == '__main__':
+    scraper = GGAScraper()
+    # sc = scraper.get_anime_info('https://gogoanime.sh/category/shingeki-no-kyojin-the-final-season')
+    # print(sc)
+    a = scraper.get_download_link('https://gogoanime.sh/shingeki-no-kyojin-the-final-season-episode-10',
+                                  resolution=Resolution.HIGH)
+    print(a)

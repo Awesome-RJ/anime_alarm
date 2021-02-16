@@ -2,6 +2,11 @@
 This module contains custom exception classes that can be raised by Anime Alarm
 """
 
+__all__ = [
+    'CannotDownloadAnimeException',
+    'CannotGetAnimeInfoException',
+    'UserNotFoundException'
+]
 
 class CannotDownloadAnimeException(Exception):
     def __init__(self, anime, base_err: Exception):

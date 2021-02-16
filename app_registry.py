@@ -1,29 +1,34 @@
 from dotenv import load_dotenv
 from telegram.ext import Updater
 from faunadb.client import FaunaClient
-from anime_alarm.scraping import GGAScraper
 import logging
 from sentry_sdk import capture_exception
 import os
 
 load_dotenv()
 
+maintenance_message = 'Bot is currently undergoing maintenance and upgrades'
+
 config = {
     "message": {
         "help": "Hi, I'm Anime Alarm!\nI'm capable of bringing the latest anime episodes straight to your DMs for "
                 "download and many more.\nHere's how to take advantage of my greatness:\n\n/subscribe - subscribe to "
-                "any anime and get updates for new episodes\n/unsubscribe - stop receiving updates for an "
-                "anime\n/latest - download the last episode of any anime instantly\n/help - get help and learn about "
-                "Anime Alarm\n/donate - donate to help this project\n/recommend - get anime recommendations based on "
-                "what other people using Anime Alarm are watching",
+                "any anime and get updates for new episodes\n\n/unsubscribe - stop receiving updates for an "
+                "anime\n\n/latest - download the last episode of any anime instantly\n\n/help - get help and learn about "
+                "Anime Alarm\n\n/donate - donate to help this project\n\n/recommend - get anime recommendations based on "
+                "what other people using Anime Alarm are watching\n\n/resolution - change the resolution of the animes "
+                "that will be sent to you. This resolution will be applied for both the /subscribe and /latest "
+                "commands",
         "help_admin": "Hi, I'm Anime Alarm!\nI'm capable of bringing the latest anime episodes straight to your DMs "
                       "for download and many more.\nHere's how to take advantage of my greatness:\n\n/subscribe - "
-                      "subscribe to any anime and get updates for new episodes\n/unsubscribe - stop receiving updates "
-                      "for an anime\n/latest - download the last episode of any anime instantly\n/help - get help and "
-                      "learn about Anime Alarm\n/donate - donate to help this project\n/recommend - get anime "
-                      "recommendations based on what other people using Anime Alarm are watching\n/usercount - get "
-                      "number of users\n/animecount - get number of anime\n/broadcast - broadcast messages to all "
-                      "users\n/log - read app logs",
+                      "subscribe to any anime and get updates for new episodes\n\n/unsubscribe - stop receiving updates "
+                      "for an anime\n\n/latest - download the last episode of any anime instantly\n\n/help - get help and "
+                      "learn about Anime Alarm\n\n/donate - donate to help this project\n\n/recommend - get anime "
+                      "recommendations based on what other people using Anime Alarm are watching\n\n/usercount - get "
+                      "number of users\n\n/animecount - get number of anime\n\n/broadcast - broadcast messages to all "
+                      "users\n\n/log - read app logs\n\n/resolution - change the resolution of the animes "
+                      "that will be sent to you. This resolution will be applied for both the /subscribe and /latest "
+                      "commands",
         "donate": [
             "You can donate in Bitcoin and Ethereum to help the development of this project.",
             "Bitcoin address:",
@@ -32,9 +37,7 @@ config = {
             "0xe57a812d0185eddffda0097b6d5ba38f240325fa"
         ]
     },
-    "app_log_path": "./app.log"
 }
-
 
 client = FaunaClient(secret=os.getenv('FAUNA_SERVER_SECRET'))
 updater = Updater(token=os.getenv('TELEGRAM_TOKEN'), use_context=True)
@@ -47,11 +50,11 @@ anime_by_title = 'all_animes_by_title'
 sort_anime_by_followers = 'sort_animes_by_followers'
 anime_by_id = 'all_anime_by_anime_id'
 
-scraper = GGAScraper()
+# scraper = GGAScraper()
 
 # setting up custom logger
 
-log_file_path = 'app.log'
+log_file_path = os.getenv('APP_LOG_PATH')
 
 f_handler = logging.FileHandler(log_file_path, mode='a+')
 f_format = logging.Formatter(
