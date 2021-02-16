@@ -81,30 +81,36 @@ class User:
                             )
                         ),
                         q.do(
-                            q.create(
-                                q.collection(animes),
-                                {
-                                    'data': {
-                                        'title': anime_info['title'],
-                                        'followers': 1,
-                                        'link': anime_link,
-                                        'anime_id': anime_info['anime_id'],
-                                        'anime_alias': anime_info['anime_alias'],
-                                        'episodes': anime_info['number_of_episodes'],
-                                        'last_episode': {
-                                            'link': anime_info['latest_episode_link'],
-                                            'title': anime_info['latest_episode_title'],
-                                        },
-                                    }
-                                }
-                            ),
-
                             # add to user's list of subscribed animes
                             q.update(
                                 q.ref(q.collection(users), self.chat_id),
                                 {
                                     'data': {
-                                        'animes_watching': q.append(q.var('user_anime_list'), q.var('anime_ref'))
+                                        'animes_watching': q.append(
+                                            q.var('user_anime_list'),
+                                            q.select(
+                                                ['ref'],
+
+                                                # create new anime document
+                                                q.create(
+                                                    q.collection(animes),
+                                                    {
+                                                        'data': {
+                                                            'title': anime_info['title'],
+                                                            'followers': 1,
+                                                            'link': anime_link,
+                                                            'anime_id': anime_info['anime_id'],
+                                                            'anime_alias': anime_info['anime_alias'],
+                                                            'episodes': anime_info['number_of_episodes'],
+                                                            'last_episode': {
+                                                                'link': anime_info['latest_episode_link'],
+                                                                'title': anime_info['latest_episode_title'],
+                                                            },
+                                                        }
+                                                    }
+                                                )
+                                            ),
+                                        )
                                     }
                                 }
                             ),
