@@ -5,3 +5,7 @@ app.log
 .vscode/
 dev/
 .idea/
+private.key
+cert.pem
+anime_alarm/private.key
+anime_alarm/cert.pem

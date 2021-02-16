@@ -36,63 +36,78 @@ class User:
             anime_info = anime_alarm.utils.GGAScraper().get_anime_info(anime_link)
 
             result = client.query(
-                q.if_(
-                    # check if this anime exists in the db
-                    q.exists(q.match(q.index(anime_by_id), anime_info['anime_id'])),
+                q.let(
+                    {
+                        'user_anime_list': q.select(
+                            ['data', 'animes_watching'],
+                            q.get(q.ref(q.collection(users), self.chat_id))
+                        ),
+                    },
+                    q.if_(
+                        # check if this anime exists in the db
+                        q.exists(q.match(q.index(anime_by_id), anime_info['anime_id'])),
 
-                    # if it exists...
-                    q.let(
-                        {
-                            'user_anime_list': q.select(
-                                ['data', 'animes_watching'],
-                                q.get(q.ref(q.collection(users), self.chat_id))
-                            ),
-                            'anime_ref': q.select(['ref'], q.match(q.index(anime_by_id), anime_info['anime_id']))
-                        },
-                        q.if_(
-                            # check if user has subscribed to this anime already
-                            q.contains_value(q.var('anime_ref'), q.var('user_anime_list')),
-                            'This anime is already on your watch list!',
-                            q.do(
-                                q.update(
-                                    q.ref(q.collection(users), self.chat_id),
-                                    {
-                                        'data': {
-                                            'animes_watching': q.append(q.var('user_anime_list'), q.var('anime_ref'))
-                                        }
-                                    }
-                                ),
-                                q.update(
-                                    q.var('anime_ref'),
-                                    {
-                                        'data': {
-                                            'followers': q.add(
-                                                q.select(['data', 'followers'], q.get(q.var('anime_ref'))),
-                                                1
-                                            )
-                                        }
-                                    }
-                                ),
-                            )
-                        )
-                    ),
-                    q.do(
-                        q.create(
-                            q.collection(animes),
+                        # if it exists...
+                        q.let(
                             {
-                                'data': {
-                                    'title': anime_info['title'],
-                                    'followers': 0,
-                                    'link': anime_link,
-                                    'anime_id': anime_info['anime_id'],
-                                    'anime_alias': anime_info['anime_alias'],
-                                    'episodes': anime_info['number_of_episodes'],
-                                    'last_episode': {
-                                        'link': anime_info['latest_episode_link'],
-                                        'title': anime_info['latest_episode_title'],
-                                    },
+                                'anime_ref': q.select(['ref'], q.match(q.index(anime_by_id), anime_info['anime_id']))
+                            },
+                            q.if_(
+                                # check if user has subscribed to this anime already
+                                q.contains_value(q.var('anime_ref'), q.var('user_anime_list')),
+                                'This anime is already on your watch list!',
+                                q.do(
+                                    q.update(
+                                        q.ref(q.collection(users), self.chat_id),
+                                        {
+                                            'data': {
+                                                'animes_watching': q.append(q.var('user_anime_list'),
+                                                                            q.var('anime_ref'))
+                                            }
+                                        }
+                                    ),
+                                    q.update(
+                                        q.var('anime_ref'),
+                                        {
+                                            'data': {
+                                                'followers': q.add(
+                                                    q.select(['data', 'followers'], q.get(q.var('anime_ref'))),
+                                                    1
+                                                )
+                                            }
+                                        }
+                                    ),
+                                )
+                            )
+                        ),
+                        q.do(
+                            q.create(
+                                q.collection(animes),
+                                {
+                                    'data': {
+                                        'title': anime_info['title'],
+                                        'followers': 1,
+                                        'link': anime_link,
+                                        'anime_id': anime_info['anime_id'],
+                                        'anime_alias': anime_info['anime_alias'],
+                                        'episodes': anime_info['number_of_episodes'],
+                                        'last_episode': {
+                                            'link': anime_info['latest_episode_link'],
+                                            'title': anime_info['latest_episode_title'],
+                                        },
+                                    }
                                 }
-                            }
+                            ),
+
+                            # add to user's list of subscribed animes
+                            q.update(
+                                q.ref(q.collection(users), self.chat_id),
+                                {
+                                    'data': {
+                                        'animes_watching': q.append(q.var('user_anime_list'), q.var('anime_ref'))
+                                    }
+                                }
+                            ),
                         )
                     )
                 )
