@@ -89,7 +89,7 @@ class User:
                                         'animes_watching': q.append(
                                             q.var('user_anime_list'),
                                             q.select(
-                                                ['ref'],
+                                                'ref',
 
                                                 # create new anime document
                                                 q.create(
