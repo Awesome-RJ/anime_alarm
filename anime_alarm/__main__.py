@@ -6,7 +6,6 @@ if __name__ == '__main__':
     print('started')
     updater.start_webhook(
         listen='0.0.0.0',
-        port=int(os.getenv('PORT')),
         key='private.key',
         cert='cert.pem',
         url_path=os.getenv('TELEGRAM_TOKEN'),
