@@ -11,5 +11,5 @@ if __name__ == '__main__':
         url_path=os.getenv('TELEGRAM_TOKEN'),
         webhook_url=os.getenv('TELEGRAM_BOT_URL') + os.getenv('TELEGRAM_TOKEN')
     )
-    updater.bot.setWebhook(os.getenv('TELEGRAM_BOT_URL') + os.getenv('TELEGRAM_TOKEN'))
+    # updater.bot.setWebhook(os.getenv('TELEGRAM_BOT_URL') + os.getenv('TELEGRAM_TOKEN'))
     run_cron()
