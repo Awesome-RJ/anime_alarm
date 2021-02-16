@@ -72,7 +72,6 @@ def log_error(error: Exception, log_to_admin_telegram=False) -> None:
     capture_exception(error)
     logger.error(
         msg=error_message,
-        exc_info=True
     )
 
     if log_to_admin_telegram is True:

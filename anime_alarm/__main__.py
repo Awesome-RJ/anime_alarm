@@ -4,6 +4,7 @@ import os
 
 if __name__ == '__main__':
     print('started')
+    # updater.start_polling()
     updater.start_webhook(
         listen='0.0.0.0',
         key='./private.key',
