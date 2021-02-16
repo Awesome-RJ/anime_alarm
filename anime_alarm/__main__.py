@@ -1,6 +1,9 @@
 from app_registry import updater
 from anime_alarm import run_cron
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 if __name__ == '__main__':
     print('started')
