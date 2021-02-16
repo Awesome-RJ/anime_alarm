@@ -87,8 +87,9 @@ def send_update_to_subscribed_users(anime: Union[Dict[str, Any], str, int], down
                         # if link for particular resolution has not been scraped yet...
                         user_resolution = Resolution(user['data']['config']['resolution'])
                         if user_resolution not in download_links:
-                            download_links[user_resolution] = scraper.get_download_link(anime_info['latest_episode_link'],
-                                                                                        user_resolution)
+                            download_links[user_resolution] = scraper.get_download_link(
+                                anime_info['latest_episode_link'],
+                                user_resolution)
                         markup = [[InlineKeyboardButton(text='Download', url=download_links[user_resolution])]]
                         text = "Here's the latest episode for {0}:\n\n{1}".format(anime['data']['title'],
                                                                                   anime_info['latest_episode_title'])
@@ -110,11 +111,12 @@ def send_update_to_subscribed_users(anime: Union[Dict[str, Any], str, int], down
             except CannotDownloadAnimeException as err:
                 log_error(err)
                 subscribed_users = get_subscribed_users_for_anime(anime['ref'].id())
+
                 # tell subscribed user episode is available but can't download
                 for user in subscribed_users:
                     text = "A new episode for {0}: {1} is now out.\nSadly, I could not download it\U0001F622".format(
                         anime['data']['title'], anime_info['latest_episode_title'])
-                    # updater.bot.send_message(chat_id=int(user['ref'].id()), text=text)
+                    updater.bot.send_message(chat_id=int(user['ref'].id()), text=text)
                 # send message to admin
                 updater.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text=anime['data'][
                                                                                       'title'] + ' just got a new '
@@ -144,12 +146,11 @@ def send_update_to_subscribed_users(anime: Union[Dict[str, Any], str, int], down
         pass
 
 
-# @mark_inactive(message=maintenance_message)
 def error_handler(update: Update, context: CallbackContext):
     try:
         raise context.error
     except BadRequest as err:
-        # handle malformed requests - read more below!
+        # handle malformed requests
         log_error(err)
     except TimedOut as err:
         # handle slow connection problems
@@ -167,8 +168,6 @@ def error_handler(update: Update, context: CallbackContext):
         log_error(err)
 
 
-# @mark_inactive(message=maintenance_message)
-@admin_only
 def plain_message(update: Update, context: CallbackContext):
     print(update.effective_message)
     try:
@@ -251,8 +250,6 @@ def plain_message(update: Update, context: CallbackContext):
                                       "discover what I can help you with.")
 
 
-# @mark_inactive(message=maintenance_message)
-@admin_only
 def callback_handler_func(update: Update, context: CallbackContext):
     user = User(update.effective_chat.id)
     callback_message = update.callback_query.message.reply_markup.inline_keyboard[0][0].callback_data
@@ -307,8 +304,6 @@ def callback_handler_func(update: Update, context: CallbackContext):
                 send_update_to_subscribed_users(anime_from_db,
                                                 download_links={user.resolution: latest_episode_download_link},
                                                 anime_info=anime_info)
-            print('anime_from_db: ')
-            print(anime_from_db)
     elif command == 'set_resolution':
         try:
             new_res = Resolution(payload)

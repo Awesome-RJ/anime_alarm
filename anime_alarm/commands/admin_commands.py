@@ -47,7 +47,6 @@ def number_of_anime(update: Update, context: CallbackContext):
     context.bot.send_message(chat_id=update.effective_chat.id, text='Number of anime: ' + str(result['data'][0]))
 
 
-@mark_inactive(message=maintenance_message)
 @admin_only
 def broadcast(update: Update, context: CallbackContext):
     user = User(update.effective_chat.id)
@@ -55,7 +54,6 @@ def broadcast(update: Update, context: CallbackContext):
     user.last_command = 'broadcast'
 
 
-# @mark_inactive(message=maintenance_message)
 @admin_only
 def app_log(update: Update, context: CallbackContext):
     user = User(update.effective_chat.id)

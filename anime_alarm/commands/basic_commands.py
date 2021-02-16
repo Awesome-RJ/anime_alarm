@@ -15,7 +15,6 @@ __all__ = [
 ]
 
 
-# @mark_inactive(message=maintenance_message)
 def help_user(update, context):
     user = User(update.effective_chat.id)
     if str(user.chat_id) == str(os.getenv('ADMIN_CHAT_ID')):
@@ -74,8 +73,6 @@ def donate(update, context):
         log_error(err)
 
 
-# @mark_inactive(message=maintenance_message)
-@admin_only
 def get_latest(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
 
@@ -111,7 +108,6 @@ def get_latest(update: Update, context: CallbackContext):
         log_error(err)
 
 
-# @mark_inactive(message=maintenance_message)
 def recommend(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
     results = client.query(
@@ -134,8 +130,6 @@ def recommend(update: Update, context: CallbackContext):
                                  text=str(results['data'].index(anime) + 1) + '. ' + anime['data']['title'])
 
 
-# @mark_inactive(message=maintenance_message)
-@admin_only
 def resolution(update: Update, context: CallbackContext):
     user = User(update.effective_chat.id)
 
@@ -143,4 +137,5 @@ def resolution(update: Update, context: CallbackContext):
     for res in resolutions:
         markup = [[InlineKeyboardButton(text='Select',
                                         callback_data='set_resolution=' + res.value)]]
-        context.bot.send_message(text=str(res.value).capitalize() + ' - ' + resolutions[res], chat_id=user.chat_id, reply_markup=InlineKeyboardMarkup(markup))
+        context.bot.send_message(text=str(res.value).capitalize() + ' - ' + resolutions[res], chat_id=user.chat_id,
+                                 reply_markup=InlineKeyboardMarkup(markup))

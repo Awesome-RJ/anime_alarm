@@ -5,7 +5,7 @@ from telegram.ext import CommandHandler, MessageHandler, CallbackQueryHandler, F
 from dotenv import load_dotenv
 import datetime
 import sentry_sdk
-from .commands import *
+from anime_alarm.commands import *
 
 # set up sentry
 sentry_sdk.init(

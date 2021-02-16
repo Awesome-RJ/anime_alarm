@@ -10,8 +10,6 @@ __all__ = [
 ]
 
 
-# @mark_inactive(message=maintenance_message)
-@admin_only
 def subscribe(update, context):
     chat_id = update.effective_chat.id
 
@@ -49,8 +47,6 @@ def subscribe(update, context):
         log_error(err)
 
 
-# @mark_inactive(message=maintenance_message)
-@admin_only
 def unsubscribe(update: Update, context: CallbackContext):
     user = User(update.effective_chat.id)
     try:
