@@ -52,7 +52,7 @@ class User:
                         # if it exists...
                         q.let(
                             {
-                                'anime_ref': q.select('ref', q.match(q.index(anime_by_id), anime_info['anime_id']))
+                                'anime_ref': q.select('ref', q.get(q.match(q.index(anime_by_id), anime_info['anime_id'])))
                             },
                             q.if_(
                                 # check if user has subscribed to this anime already
