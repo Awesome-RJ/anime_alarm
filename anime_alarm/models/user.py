@@ -64,7 +64,7 @@ class User:
                                         {
                                             'data': {
                                                 'animes_watching': q.append(q.var('user_anime_list'),
-                                                                            q.var('anime_ref'))
+                                                                            [q.var('anime_ref')])
                                             }
                                         }
                                     ),
