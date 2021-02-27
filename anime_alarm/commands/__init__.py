@@ -92,7 +92,9 @@ def send_update_to_subscribed_users(anime: Union[Dict[str, Any], str, int], down
                                 user_resolution)
                         markup = [[InlineKeyboardButton(text='Download', url=download_links[user_resolution])]]
                         text = "Here's the latest episode for {0}:\n\n{1}".format(anime['data']['title'],
-                                                                                  anime_info['latest_episode_title'])
+                                                                                      anime_info['latest_episode_title'])
+                        if anime['data']['anime_id'] == '9914':
+                            text = "It's AOT Sunday!!\n\n"+text+"\n\nShinzou Wo Sasageyo!!"
 
                         updater.bot.send_message(chat_id=int(user['ref'].id()), text=text,
                                                  reply_markup=InlineKeyboardMarkup(markup))

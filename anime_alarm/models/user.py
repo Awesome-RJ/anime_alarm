@@ -9,12 +9,9 @@ from anime_alarm.enums import Resolution
 import anime_alarm.utils
 import os
 
-
 __all__ = [
     'User'
 ]
-
-
 
 
 class User:
@@ -52,7 +49,8 @@ class User:
                         # if it exists...
                         q.let(
                             {
-                                'anime_ref': q.select('ref', q.get(q.match(q.index(anime_by_id), anime_info['anime_id'])))
+                                'anime_ref': q.select('ref',
+                                                      q.get(q.match(q.index(anime_by_id), anime_info['anime_id'])))
                             },
                             q.if_(
                                 # check if user has subscribed to this anime already
@@ -227,9 +225,8 @@ class User:
             )
         )
 
+
 if __name__ == "__main__":
     user = User(os.getenv('ADMIN_CHAT_ID'))
     print(user.resolution)
     print(user.resolution)
-
-
