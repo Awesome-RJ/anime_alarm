@@ -23,27 +23,23 @@ def shorten(link: str) -> str:
             # shorten with bit.ly if tinyurl does not work
             shortened_link = shortener.bitly.short(link)
         except exceptions.BadAPIResponseException as err:
-            raise Exception(
-                'This link cannot be shortened: '+str(err)) from err
+            raise Exception(f'This link cannot be shortened: {str(err)}') from err
         except exceptions.ShorteningErrorException as err:
-            raise Exception(
-                'This link cannot be shortened: '+str(err)) from err
+            raise Exception(f'This link cannot be shortened: {str(err)}') from err
         else:
             return shortened_link
     except exceptions.BadAPIResponseException as err:
-        raise Exception('This link cannot be shortened: '+str(err)) from err
+        raise Exception(f'This link cannot be shortened: {str(err)}') from err
     except exceptions.BadURLException as err:
-        raise Exception('This link cannot be shortened: '+str(err)) from err
+        raise Exception(f'This link cannot be shortened: {str(err)}') from err
     except Exception as err:
         try:
             # shorten with bit.ly if tinyurl does not work
             shortened_link = shortener.bitly.short(link)
         except exceptions.BadAPIResponseException as err:
-            raise Exception(
-                'This link cannot be shortened: '+str(err)) from err
+            raise Exception(f'This link cannot be shortened: {str(err)}') from err
         except exceptions.ShorteningErrorException as err:
-            raise Exception(
-                'This link cannot be shortened: '+str(err)) from err
+            raise Exception(f'This link cannot be shortened: {str(err)}') from err
         else:
             return shortened_link
     else:

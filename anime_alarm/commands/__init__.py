@@ -67,7 +67,7 @@ def send_update_to_subscribed_users(anime: Union[Dict[str, Any], str, int], down
     download_links = download_links
     if isinstance(anime, dict):
         pass
-    elif isinstance(anime, str) or isinstance(anime, int):
+    elif isinstance(anime, (str, int)):
         anime = client.query(
             q.get(q.ref(q.collection(animes), str(anime)))
         )
@@ -76,76 +76,74 @@ def send_update_to_subscribed_users(anime: Union[Dict[str, Any], str, int], down
         anime_info = scraper.get_anime_info(anime['data']['link'])
 
     # if there is a new episode...
-    if anime_info['number_of_episodes'] > anime['data']['episodes']:
-        if anime_info['latest_episode_link'] != anime['data']['last_episode']['link']:
-            try:
-                subscribed_users = get_subscribed_users_for_anime(anime['ref'].id())
+    if (
+        anime_info['number_of_episodes'] > anime['data']['episodes']
+        and anime_info['latest_episode_link']
+        != anime['data']['last_episode']['link']
+    ):
+        try:
+            subscribed_users = get_subscribed_users_for_anime(anime['ref'].id())
 
-                # send message to subscribed users
-                for user in subscribed_users:
-                    try:
-                        # if link for particular resolution has not been scraped yet...
-                        user_resolution = Resolution(user['data']['config']['resolution'])
-                        if user_resolution not in download_links:
-                            download_links[user_resolution] = scraper.get_download_link(
-                                anime_info['latest_episode_link'],
-                                user_resolution)
-                        markup = [[InlineKeyboardButton(text='Download', url=download_links[user_resolution])]]
-                        text = "Here's the latest episode for {0}:\n\n{1}".format(anime['data']['title'],
-                                                                                      anime_info['latest_episode_title'])
-                        if anime['data']['anime_id'] == '9914':
-                            text = "It's AOT Sunday!!\n\n"+text+"\n\nShinzou Wo Sasageyo!!"
+            # send message to subscribed users
+            for user in subscribed_users:
+                try:
+                    # if link for particular resolution has not been scraped yet...
+                    user_resolution = Resolution(user['data']['config']['resolution'])
+                    if user_resolution not in download_links:
+                        download_links[user_resolution] = scraper.get_download_link(
+                            anime_info['latest_episode_link'],
+                            user_resolution)
+                    markup = [[InlineKeyboardButton(text='Download', url=download_links[user_resolution])]]
+                    text = "Here's the latest episode for {0}:\n\n{1}".format(anime['data']['title'],
+                                                                                  anime_info['latest_episode_title'])
+                    if anime['data']['anime_id'] == '9914':
+                        text = "It's AOT Sunday!!\n\n"+text+"\n\nShinzou Wo Sasageyo!!"
 
-                        updater.bot.send_message(chat_id=int(user['ref'].id()), text=text,
-                                                 reply_markup=InlineKeyboardMarkup(markup))
+                    updater.bot.send_message(chat_id=int(user['ref'].id()), text=text,
+                                             reply_markup=InlineKeyboardMarkup(markup))
 
-                    except Unauthorized:
-                        # user has blocked bot
-                        # delete user from list
-                        client.query(q.delete(user['ref']))
-                        logger.info("A user has been deleted from user list")
-                # send message to admin
-                updater.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'),
-                                         text=anime['data']['title'] + ' just got a new episode and was updated!')
-                logger.info(
-                    str(len(subscribed_users)) + " users were notified of an update to " + anime['data']['title'])
+                except Unauthorized:
+                    # user has blocked bot
+                    # delete user from list
+                    client.query(q.delete(user['ref']))
+                    logger.info("A user has been deleted from user list")
+            # send message to admin
+            updater.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'),
+                                     text=anime['data']['title'] + ' just got a new episode and was updated!')
+            logger.info(
+                str(len(subscribed_users)) + " users were notified of an update to " + anime['data']['title'])
 
-            except CannotDownloadAnimeException as err:
-                log_error(err)
-                subscribed_users = get_subscribed_users_for_anime(anime['ref'].id())
+        except CannotDownloadAnimeException as err:
+            log_error(err)
+            subscribed_users = get_subscribed_users_for_anime(anime['ref'].id())
 
-                # tell subscribed user episode is available but can't download
-                for user in subscribed_users:
-                    text = "A new episode for {0}: {1} is now out.\nSadly, I could not download it\U0001F622".format(
-                        anime['data']['title'], anime_info['latest_episode_title'])
-                    updater.bot.send_message(chat_id=int(user['ref'].id()), text=text)
-                # send message to admin
-                updater.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text=anime['data'][
-                                                                                      'title'] + ' just got a new '
-                                                                                                 'episode but could '
-                                                                                                 'not be downloaded')
+            # tell subscribed user episode is available but can't download
+            for user in subscribed_users:
+                text = "A new episode for {0}: {1} is now out.\nSadly, I could not download it\U0001F622".format(
+                    anime['data']['title'], anime_info['latest_episode_title'])
+                updater.bot.send_message(chat_id=int(user['ref'].id()), text=text)
+            # send message to admin
+            updater.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text=anime['data'][
+                                                                                  'title'] + ' just got a new '
+                                                                                             'episode but could '
+                                                                                             'not be downloaded')
 
-            finally:
-                # update anime in db after sending messages to users
-                client.query(
-                    q.update(
-                        anime['ref'],
-                        {
-                            'data': {
-                                'episodes': anime_info['number_of_episodes'],
-                                'last_episode': {
-                                    'title': anime_info['latest_episode_title'],
-                                    'link': anime_info['latest_episode_link']
-                                }
+        finally:
+            # update anime in db after sending messages to users
+            client.query(
+                q.update(
+                    anime['ref'],
+                    {
+                        'data': {
+                            'episodes': anime_info['number_of_episodes'],
+                            'last_episode': {
+                                'title': anime_info['latest_episode_title'],
+                                'link': anime_info['latest_episode_link']
                             }
                         }
-                    )
+                    }
                 )
-
-        else:
-            pass
-    else:
-        pass
+            )
 
 
 def error_handler(update: Update, context: CallbackContext):
@@ -234,10 +232,7 @@ def plain_message(update: Update, context: CallbackContext):
                 # spin 5 processes
                 with Pool(5) as p:
                     res = p.map(send_broadcast, [[int(user_ref.id()), message] for user_ref in results])
-                    successful_broadcast = []
-                    for i in res:
-                        if i == 'success':
-                            successful_broadcast.append(i)
+                    successful_broadcast = [i for i in res if i == 'success']
                     logger.info('Message broadcast to ' + str(len(successful_broadcast)) + ' users')
                     print(res)
                 # update user last command
@@ -315,5 +310,3 @@ def callback_handler_func(update: Update, context: CallbackContext):
         except ValueError:
             context.bot.send_message(chat_id=user.chat_id, text='Unidentified resolution level!')
             context.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text='Unidentified resolution level!')
-    else:
-        pass

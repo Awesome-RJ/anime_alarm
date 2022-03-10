@@ -183,10 +183,12 @@ class User:
 
     @property
     def last_command(self) -> str:
-        last_command = client.query(
-            q.select(['data', 'last_command'], q.get(q.ref(q.collection(users), self.chat_id)))
+        return client.query(
+            q.select(
+                ['data', 'last_command'],
+                q.get(q.ref(q.collection(users), self.chat_id)),
+            )
         )
-        return last_command
 
     @last_command.setter
     def last_command(self, new_last_command: str):

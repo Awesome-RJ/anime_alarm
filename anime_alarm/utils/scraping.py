@@ -30,7 +30,7 @@ class GGAScraper:
 
     @staticmethod
     def get_anime(anime: str, limit=10) -> List:
-        url = "https://gogoanime.so//search.html?keyword=" + anime
+        url = f"https://gogoanime.so//search.html?keyword={anime}"
         page = requests.get(url)
 
         soup = BeautifulSoup(page.content, 'html.parser')
@@ -84,9 +84,8 @@ class GGAScraper:
                     'latest_episode_title': '',
                     'latest_episode_link': '',
                 }
-            else:
-                latest_episode_elem = episodes_elem.find_all('li', limit=1)[0]
-                link = site_home_link + (latest_episode_elem.find('a')['href']).strip()
+            latest_episode_elem = episodes_elem.find_all('li', limit=1)[0]
+            link = site_home_link + (latest_episode_elem.find('a')['href']).strip()
         except Exception as err:
             raise CannotGetAnimeInfoException(animelink, err)
         return {
@@ -94,7 +93,8 @@ class GGAScraper:
             'number_of_episodes': int(last_episode),
             'anime_id': anime_id,
             'anime_alias': alias,
-            'latest_episode_title': title + ' ' + latest_episode_elem.find('div', class_='name').text.strip(),
+            'latest_episode_title': f'{title} '
+            + latest_episode_elem.find('div', class_='name').text.strip(),
             'latest_episode_link': link,
         }
 
@@ -118,12 +118,12 @@ class GGAScraper:
                 # required_div refers to a single-element list containing the div we want
                 required_div = [div for div in download_divs if
                                 resolutions[Resolution.MEDIUM].lower() in div.text.strip().lower()]
-                if len(required_div) == 0:
-                    # get first available link
-                    download_link = download_divs[0].find('a')['href']
-                else:
-                    # get link for medium resolution
-                    download_link = shorten(required_div[0].find('a')['href'])
+                download_link = (
+                    shorten(required_div[0].find('a')['href'])
+                    if required_div
+                    else download_divs[0].find('a')['href']
+                )
+
         except Exception as err:
             raise CannotDownloadAnimeException(episode_link, err)
 
@@ -138,7 +138,7 @@ class KAScraper:
 
     def get_anime(self, anime: str, limit=10) -> list:
         anime = '+'.join(anime.split(sep=' '))
-        url = "https://kissanime.nz/Search/?s=" + anime
+        url = f"https://kissanime.nz/Search/?s={anime}"
         page = requests.get(url)
 
         soup = BeautifulSoup(page.content, 'html.parser')
@@ -174,14 +174,10 @@ class KAScraper:
 
         episode_elems = results.find_all('a', limit=limit)
 
-        result_list = []
-        for ep in episode_elems:
-            result_list.append({
+        return [{
                 'title': ep.text.strip(),
                 'link': ep['href'].strip(),
-            })
-
-        return result_list
+            } for ep in episode_elems]
 
     def get_anime_episode_download_link(self, anime_link: str) -> str:
         cookies = {
@@ -223,8 +219,7 @@ class KAScraper:
         }
 
         page = requests.get(durl, headers=headers, allow_redirects=False)
-        download_link = page.headers['Location']
-        return download_link
+        return page.headers['Location']
 
 
 if __name__ == '__main__':
