@@ -68,7 +68,7 @@ logger.setLevel(logging.DEBUG)
 
 
 def log_error(error: Exception, log_to_admin_telegram=False) -> None:
-    error_message = 'An error occurred: ' + str(error)
+    error_message = f'An error occurred: {str(error)}'
     capture_exception(error)
     logger.error(
         msg=error_message,
@@ -76,5 +76,3 @@ def log_error(error: Exception, log_to_admin_telegram=False) -> None:
 
     if log_to_admin_telegram is True:
         updater.bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'), text=error_message)
-    else:
-        pass

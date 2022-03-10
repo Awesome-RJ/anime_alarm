@@ -137,5 +137,8 @@ def resolution(update: Update, context: CallbackContext):
     for res in resolutions:
         markup = [[InlineKeyboardButton(text='Select',
                                         callback_data='set_resolution=' + res.value)]]
-        context.bot.send_message(text=str(res.value).capitalize() + ' - ' + resolutions[res], chat_id=user.chat_id,
-                                 reply_markup=InlineKeyboardMarkup(markup))
+        context.bot.send_message(
+            text=f'{str(res.value).capitalize()} - {resolutions[res]}',
+            chat_id=user.chat_id,
+            reply_markup=InlineKeyboardMarkup(markup),
+        )
